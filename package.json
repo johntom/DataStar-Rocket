@@ -1,0 +1,14 @@
+{
+  "name": "rocket-tom-select",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@fastify/static": "^9.0.0",
+    "@johntom/datastar-fastify": "github:johntom/datastar-fastify-sdk",
+    "fastify": "^5"
+  }
+}

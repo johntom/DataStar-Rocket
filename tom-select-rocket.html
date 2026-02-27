@@ -1,0 +1,151 @@
+<!--
+  Rocket Tom Select Component
+  ============================
+  A Datastar Rocket web component wrapping Tom Select.
+
+  Usage:
+    <rocket-tom-select
+      placeholder="Pick a fruit..."
+      max-items="3"
+      options='[{"value":"a","text":"Apple"}]'
+      data-on:ts-change="$selectedFruit = evt.detail.value"
+    ></rocket-tom-select>
+
+  Props:
+    placeholder  - Placeholder text (string, default: "Select...")
+    max-items    - Max selectable items (int, default: 1)
+    options      - JSON string of [{value, text}] objects (string, passed as attribute)
+    value        - Current value, comma-separated for multi (string)
+    allow-create - Allow user to create new items (boolean, default: false)
+    search-url   - Backend URL for remote search (string, optional)
+
+  Emits:
+    ts-change CustomEvent with detail.value (string)
+    Listen via: data-on:ts-change="$mySignal = evt.detail.value"
+
+  Note: options uses string type (not json) to avoid Datastar signal proxy
+  issues with arrays. The JSON is parsed inside the component script.
+-->
+
+<template data-rocket:rocket-tom-select
+  data-props:placeholder="string|=Select..."
+  data-props:max-items="int|min:1|=1"
+  data-props:options="string|="
+  data-props:value="string|="
+  data-props:allow-create="boolean|=false"
+  data-props:search-url="string|="
+  data-import:TomSelect__iife="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"
+>
+  <script>
+    let tsInstance = null
+
+    function parseOptions() {
+      try {
+        const raw = '' + ($$options || '')
+        return raw ? JSON.parse(raw) : []
+      } catch(e) {
+        return []
+      }
+    }
+
+    function buildConfig() {
+      const opts = parseOptions()
+      const config = {
+        placeholder: '' + ($$placeholder || ''),
+        maxItems: +($$maxItems || 1),
+        create: !!($$allowCreate),
+        plugins: {},
+        onInitialize: function () {
+          var v = '' + ($$value || '')
+          if (v) {
+            this.setValue(v.split(','), true)
+          }
+        },
+        onChange: function (val) {
+          try {
+            var strVal = Array.isArray(val) ? val.join(',') : ('' + (val || ''))
+            $$value = strVal
+            el.dispatchEvent(new CustomEvent('ts-change', {
+              detail: { value: strVal },
+              bubbles: true,
+              composed: true
+            }))
+          } catch(e) {
+            console.error('[TomSelect onChange]', e)
+          }
+        }
+      }
+
+      if (+($$maxItems || 1) > 1) {
+        config.plugins.remove_button = { title: 'Remove' }
+      }
+
+      if (opts.length > 0) {
+        config.options = opts
+        config.labelField = 'text'
+        config.valueField = 'value'
+        config.searchField = ['text']
+      }
+
+      var sUrl = '' + ($$searchUrl || '')
+      if (sUrl) {
+        config.load = function (query, callback) {
+          if (!query.length) return callback()
+          fetch(sUrl + '?q=' + encodeURIComponent(query))
+            .then(function(res) { return res.json() })
+            .then(function(data) { callback(data) })
+            .catch(function() { callback() })
+        }
+        config.labelField = 'text'
+        config.valueField = 'value'
+        config.searchField = ['text']
+      }
+
+      return config
+    }
+
+    effect(function() {
+      if (!$$selectEl || !TomSelect) return
+      if (tsInstance) return
+      tsInstance = new TomSelect($$selectEl, buildConfig())
+    })
+
+    var prevOptionsStr = ''
+    effect(function() {
+      if (!tsInstance) return
+      var optStr = '' + ($$options || '')
+      if (optStr !== prevOptionsStr) {
+        prevOptionsStr = optStr
+        try {
+          var parsed = optStr ? JSON.parse(optStr) : []
+          tsInstance.clearOptions()
+          tsInstance.addOptions(parsed)
+          tsInstance.refreshOptions(false)
+        } catch(e) {}
+      }
+    })
+
+    var lastSyncedValue = ''
+    effect(function() {
+      if (!tsInstance) return
+      var newVal = '' + ($$value || '')
+      if (newVal !== lastSyncedValue) {
+        lastSyncedValue = newVal
+        if (newVal) {
+          tsInstance.setValue(newVal.split(','), true)
+        } else {
+          tsInstance.clear(true)
+        }
+      }
+    })
+
+    onCleanup(function() {
+      if (tsInstance) {
+        tsInstance.destroy()
+        tsInstance = null
+      }
+    })
+  </script>
+
+  <select data-ref="selectEl"></select>
+</template>

@@ -1,0 +1,344 @@
+import Fastify from "fastify";
+import fastifyStatic from "@fastify/static";
+import { resolve } from "node:path";
+// import { Datastar } from "datastar-fastify";
+// import { Datastar } from "@johntom/datastar-fastify";
+//import { Datastar } from "@johntom/datastar-fastify-sdk";
+// in json    "@johntom/datastar-fastify": "github:johntom/datastar-fastify-sdk",
+import { datastarPlugin } from "@johntom/datastar-fastify";
+
+const app = Fastify({ logger: true });
+await app.register(datastarPlugin);
+await app.register(fastifyStatic, {
+  root: resolve("static"),
+  prefix: "/static/",
+});
+
+// ─── Sample Data ────────────────────────────────────────────────
+const FRUITS = [
+  { value: "apple", text: "Apple" },
+  { value: "banana", text: "Banana" },
+  { value: "cherry", text: "Cherry" },
+  { value: "dragonfruit", text: "Dragon Fruit" },
+  { value: "elderberry", text: "Elderberry" },
+  { value: "fig", text: "Fig" },
+  { value: "grape", text: "Grape" },
+  { value: "honeydew", text: "Honeydew" },
+  { value: "kiwi", text: "Kiwi" },
+  { value: "lemon", text: "Lemon" },
+  { value: "mango", text: "Mango" },
+  { value: "nectarine", text: "Nectarine" },
+  { value: "orange", text: "Orange" },
+  { value: "papaya", text: "Papaya" },
+  { value: "quince", text: "Quince" },
+];
+
+const USERS = [
+  { value: "u1", text: "Alice Johnson" },
+  { value: "u2", text: "Bob Smith" },
+  { value: "u3", text: "Charlie Brown" },
+  { value: "u4", text: "Diana Prince" },
+  { value: "u5", text: "Eve Torres" },
+  { value: "u6", text: "Frank Castle" },
+  { value: "u7", text: "Grace Hopper" },
+  { value: "u8", text: "Hank Pym" },
+];
+
+// ─── Remote Search Endpoint ─────────────────────────────────────
+app.get("/api/search/users", async (request, reply) => {
+  const q = (request.query.q || "").toLowerCase();
+  const results = USERS.filter((u) => u.text.toLowerCase().includes(q));
+  return results;
+});
+
+// ─── Main Page ──────────────────────────────────────────────────
+app.get("/", async (request, reply) => {
+  reply.type("text/html");
+  return /* html */ `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Datastar + Tom Select (Rocket) Test1 </title>
+
+  <!-- Tom Select CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/css/tom-select.css" />
+
+  <!-- Datastar Pro + Rocket -->
+  <script type="module" src="/static/datastar-pro.js"><\/script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #1a1a2e;
+      background: #f8f9fa;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #666; margin-bottom: 2rem; }
+    .card {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card h2 { margin-top: 0; font-size: 1.1rem; }
+    .card p { color: #555; font-size: 0.9rem; }
+    .output {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #f0f4f8;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+    .ts-wrap { margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Datastar + Tom Select Test2</h1>
+  <p class="subtitle">Rocket web components wrapping Tom Select, wired to Datastar signals</p>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- Rocket Component Definition                                -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <template data-rocket:rocket-tom-select
+    data-props:placeholder="string|=Select..."
+    data-props:max-items="int|min:1|=1"
+    data-props:options="string|="
+    data-props:value="string|="
+    data-props:allow-create="boolean|=false"
+    data-props:search-url="string|="
+    data-import:TomSelect__iife="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"
+  >
+    <script>
+      let tsInstance = null
+
+      function parseOptions() {
+        try {
+          var raw = '' + ($$options || '')
+          return raw ? JSON.parse(raw) : []
+        } catch(e) {
+          return []
+        }
+      }
+
+      function buildConfig() {
+        var opts = parseOptions()
+        var config = {
+          placeholder: '' + ($$placeholder || ''),
+          maxItems: +($$maxItems || 1),
+          create: !!($$allowCreate),
+          plugins: {},
+          onInitialize: function () {
+            var v = '' + ($$value || '')
+            if (v) {
+              this.setValue(v.split(','), true)
+            }
+          },
+          onChange: function (val) {
+            try {
+              var strVal = Array.isArray(val) ? val.join(',') : ('' + (val || ''))
+              $$value = strVal
+              el.dispatchEvent(new CustomEvent('ts-change', {
+                detail: { value: strVal },
+                bubbles: true,
+                composed: true
+              }))
+            } catch(e) {
+              console.error('[TomSelect onChange]', e)
+            }
+          }
+        }
+
+        if (+($$maxItems || 1) > 1) {
+          config.plugins.remove_button = { title: 'Remove' }
+        }
+
+        if (opts.length > 0) {
+          config.options = opts
+          config.labelField = 'text'
+          config.valueField = 'value'
+          config.searchField = ['text']
+        }
+
+        var sUrl = '' + ($$searchUrl || '')
+        if (sUrl) {
+          config.load = function (query, callback) {
+            if (!query.length) return callback()
+            fetch(sUrl + '?q=' + encodeURIComponent(query))
+              .then(function(res) { return res.json() })
+              .then(function(data) { callback(data) })
+              .catch(function() { callback() })
+          }
+          config.labelField = 'text'
+          config.valueField = 'value'
+          config.searchField = ['text']
+        }
+
+        return config
+      }
+
+      effect(function() {
+        if (!$$selectEl || !TomSelect) return
+        if (tsInstance) return
+        tsInstance = new TomSelect($$selectEl, buildConfig())
+      })
+
+      var prevOptionsStr = ''
+      effect(function() {
+        if (!tsInstance) return
+        var optStr = '' + ($$options || '')
+        if (optStr !== prevOptionsStr) {
+          prevOptionsStr = optStr
+          try {
+            var parsed = optStr ? JSON.parse(optStr) : []
+            tsInstance.clearOptions()
+            tsInstance.addOptions(parsed)
+            tsInstance.refreshOptions(false)
+          } catch(e) {}
+        }
+      })
+
+      var lastSyncedValue = ''
+      effect(function() {
+        if (!tsInstance) return
+        var newVal = '' + ($$value || '')
+        if (newVal !== lastSyncedValue) {
+          lastSyncedValue = newVal
+          if (newVal) {
+            tsInstance.setValue(newVal.split(','), true)
+          } else {
+            tsInstance.clear(true)
+          }
+        }
+      })
+
+      onCleanup(function() {
+        if (tsInstance) {
+          tsInstance.destroy()
+          tsInstance = null
+        }
+      })
+    <\/script>
+
+    <select data-ref="selectEl"><\/select>
+  </template>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 1: Single Select with Static Options          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:selectedFruit="''">
+    <h2>Single Select — Static Options</h2>
+    <p>Pick one fruit from the list.</p>
+
+    <rocket-tom-select
+      placeholder="Pick a fruit..."
+      max-items="1"
+      options='${JSON.stringify(FRUITS)}'
+      data-on:ts-change="$selectedFruit = evt.detail.value"
+    ></rocket-tom-select>
+
+    <div class="output">
+      Selected: <span data-text="$selectedFruit || '(none)'"></span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 2: Multi-Select with Tags                     -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:selectedFruits="''">
+    <h2>Multi-Select — Tagging</h2>
+    <p>Pick up to 5 fruits. Includes remove buttons on tags.</p>
+
+    <rocket-tom-select
+      placeholder="Choose fruits..."
+      max-items="5"
+      options='${JSON.stringify(FRUITS)}'
+      data-on:ts-change="$selectedFruits = evt.detail.value"
+    ></rocket-tom-select>
+
+    <div class="output">
+      Selected: <span data-text="$selectedFruits || '(none)'"></span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 3: Remote Search                              -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:selectedUser="''">
+    <h2>Remote Search — Users</h2>
+    <p>Type to search users from the backend. Try "alice" or "grace".</p>
+
+    <rocket-tom-select
+      placeholder="Search users..."
+      max-items="1"
+      search-url="/api/search/users"
+      data-on:ts-change="$selectedUser = evt.detail.value"
+    ></rocket-tom-select>
+
+    <div class="output">
+      Selected: <span data-text="$selectedUser || '(none)'"></span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 4: Create + Multi with Backend POST           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:tags="''">
+    <h2>Creatable Tags — with Backend Sync</h2>
+    <p>Type to create new tags. Selection is sent to the backend via SSE.</p>
+
+    <rocket-tom-select
+      placeholder="Add tags..."
+      max-items="10"
+      allow-create
+      options='${JSON.stringify([
+        { value: "javascript", text: "JavaScript" },
+        { value: "typescript", text: "TypeScript" },
+        { value: "node", text: "Node.js" },
+        { value: "datastar", text: "Datastar" },
+        { value: "fastify", text: "Fastify" },
+      ])}'
+      data-on:ts-change="$tags = evt.detail.value; @get('/api/save-tags')"
+    ></rocket-tom-select>
+
+    <div id="tag-result" class="output">
+      Tags: <span data-text="$tags || '(none)'"></span>
+    </div>
+  </div>
+
+</body>
+</html>`;
+});
+
+// ─── Tag Save Endpoint (SSE) ───────────────────────────────────
+app.get("/api/save-tags", async (request, reply) => {
+  const tags = request.query.tags || request.headers["datastar-signals"];
+  reply.datastar((sse) => {
+    const parsed = tags ? JSON.parse(tags) : {};
+    const tagList = (parsed.tags || "").split(",").filter(Boolean);
+    sse.patchElements(
+      /* html */ `
+      <div id="tag-result" class="output" style="border-left: 3px solid #22c55e;">
+        ✅ Saved ${tagList.length} tag(s): <strong>${tagList.join(", ")}</strong>
+      </div>
+    `,
+      { selector: "#tag-result", mode: "morph" },
+    );
+  });
+});
+
+// ─── Start ──────────────────────────────────────────────────────
+const PORT = process.env.PORT || 3000;
+app.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
+  if (err) {
+    app.log.error(err);
+    process.exit(1);
+  }
+  console.log(`🚀 Rocket + Tom Select running at http://localhost:${PORT}`);
+});
