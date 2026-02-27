@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"import\\(''@johntom/datastar-fastify''\\).then\\(m => console.log\\(''keys:'', Object.keys\\(m\\)\\), e => console.error\\(e\\)\\)\")",
+      "Bash(node -e \"require.resolve\\(''@fastify/static''\\)\")",
+      "Bash(npm install @fastify/static)",
+      "WebFetch(domain:cdn.jsdelivr.net)",
+      "WebFetch(domain:data-star.dev)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh repo view starfederation/datastar-pro --json name)",
+      "mcp__filesystem__directory_tree",
+      "Bash(xargs grep -l \"rocket\\\\|webcomponent\")",
+      "Bash(node -e:*)",
+      "Bash(xargs grep:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

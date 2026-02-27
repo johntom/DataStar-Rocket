@@ -1,0 +1,157 @@
+<!--
+  Rocket Tabulator Component
+  ============================
+  A Datastar Rocket web component wrapping Tabulator 6.3.
+
+  Usage:
+    <rocket-tabulator
+      columns='[{"title":"Name","field":"name","headerFilter":true}]'
+      data='[{"name":"Alice"}]'
+      height="320px"
+      layout="fitColumns"
+      movable-columns="true"
+      enable-row-click="true"
+      data-on:tab-row-click="$clicked = JSON.stringify(evt.detail.row)"
+    ></rocket-tabulator>
+
+  Props:
+    columns            - JSON string of Tabulator column definitions (string)
+    data               - JSON string of row data array (string)
+    height             - CSS height for the grid (string, default: "311px")
+    layout             - Tabulator layout mode (string, default: "fitColumns")
+    placeholder        - Empty-table message (string, default: "No Data")
+    movable-columns    - Allow column drag reorder (boolean, default: false)
+    resizable-columns  - Allow column resize (boolean, default: true)
+    enable-row-click   - Attach row click handlers (boolean, default: false)
+    initial-sort       - JSON string of [{column, dir}] sort config (string)
+
+  Emits:
+    tab-row-click         - CustomEvent with detail.row (object) on row click
+    tab-columns-changed   - CustomEvent with detail.columns ([{field, visible, width}])
+                            debounced 600ms on column move/resize/visibility change
+
+  Note: columns and data use string type (not json) to avoid Datastar signal
+  proxy issues with arrays. JSON is parsed inside the component script.
+-->
+
+<template data-rocket:rocket-tabulator
+  data-props:columns="string|="
+  data-props:data="string|="
+  data-props:height="string|=311px"
+  data-props:layout="string|=fitColumns"
+  data-props:placeholder="string|=No Data"
+  data-props:movable-columns="boolean|=false"
+  data-props:resizable-columns="boolean|=true"
+  data-props:enable-row-click="boolean|=false"
+  data-props:initial-sort="string|="
+  data-import:Tabulator__iife="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"
+>
+  <script>
+    var tabInstance = null
+    var tabReady = null  // promise resolved on tableBuilt
+    var _colTimer = null
+
+    function parseJSON(sig) {
+      try {
+        var raw = '' + (sig || '')
+        return raw ? JSON.parse(raw) : []
+      } catch(e) {
+        return []
+      }
+    }
+
+    function emitColumnState() {
+      clearTimeout(_colTimer)
+      _colTimer = setTimeout(function () {
+        if (!tabInstance) return
+        var cols = tabInstance.getColumns()
+          .filter(function (c) { return !!c.getField() })
+          .map(function (c) {
+            return { field: c.getField(), visible: c.isVisible(), width: c.getWidth() }
+          })
+        el.dispatchEvent(new CustomEvent('tab-columns-changed', {
+          detail: { columns: cols },
+          bubbles: true,
+          composed: true
+        }))
+      }, 600)
+    }
+
+    // ── Create Tabulator once ref + import are ready ──────────
+    effect(function() {
+      if (!$$tableEl || !Tabulator) return
+      if (tabInstance) return
+
+      var cols = parseJSON($$columns)
+      var rows = parseJSON($$data)
+      var sort = parseJSON($$initialSort)
+
+      var config = {
+        data:             rows,
+        layout:           '' + ($$layout || 'fitColumns'),
+        height:           '' + ($$height || '311px'),
+        movableColumns:   !!($$movableColumns),
+        resizableColumns: !!($$resizableColumns),
+        placeholder:      '' + ($$placeholder || 'No Data'),
+        columns:          cols
+      }
+
+      if (sort.length) {
+        config.initialSort = sort
+      }
+
+      if (!!($$enableRowClick)) {
+        config.rowFormatter = function (row) {
+          var rowEl = row.getElement()
+          rowEl.style.cursor = 'pointer'
+          rowEl.addEventListener('click', function () {
+            el.dispatchEvent(new CustomEvent('tab-row-click', {
+              detail: { row: row.getData() },
+              bubbles: true,
+              composed: true
+            }))
+          })
+        }
+      }
+
+      tabInstance = new Tabulator($$tableEl, config)
+
+      // seed prevDataStr so the data-watch effect only fires on real changes
+      prevDataStr = '' + ($$data || '')
+
+      tabReady = new Promise(function(resolve) {
+        tabInstance.on('tableBuilt', resolve)
+      })
+      tabInstance.on('columnMoved',             emitColumnState)
+      tabInstance.on('columnResized',           emitColumnState)
+      tabInstance.on('columnVisibilityChanged', emitColumnState)
+    })
+
+    // ── Data swap (preserves column state, sort, filters) ─────
+    var prevDataStr = ''
+    effect(function() {
+      if (!tabInstance) return
+      var dataStr = '' + ($$data || '')
+      if (dataStr !== prevDataStr) {
+        prevDataStr = dataStr
+        tabReady.then(function() {
+          try {
+            var parsed = dataStr ? JSON.parse(dataStr) : []
+            tabInstance.setData(parsed)
+          } catch(e) {}
+        })
+      }
+    })
+
+    // ── Cleanup ───────────────────────────────────────────────
+    onCleanup(function() {
+      clearTimeout(_colTimer)
+      if (tabInstance) {
+        tabInstance.destroy()
+        tabInstance = null
+      }
+    })
+  </script>
+
+  <div data-ref="tableEl" style="width:100%"></div>
+</template>
