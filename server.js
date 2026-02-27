@@ -647,6 +647,7 @@ app.get("/", async (request, reply) => {
     </div>
   </div>
 
+  <datastar-inspector></datastar-inspector>
 </body>
 </html>`;
 });
