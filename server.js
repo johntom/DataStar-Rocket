@@ -158,7 +158,6 @@ app.get("/", async (request, reply) => {
   <!-- Datastar Pro + Rocket -->
   <script type="module" src="/static/datastar-pro.js"><\/script>
   <script type="module" src="/static/datastar-inspector.js"><\/script>
-
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     body {
