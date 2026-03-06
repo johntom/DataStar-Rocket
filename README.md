@@ -1,7 +1,7 @@
-# 🚀 Rocket Tom Select
+# 🚀Rocket Tom Select RC.8  
 
-A Datastar **Rocket** web component wrapping [Tom Select](https://tom-select.js.org/).
-Requires a [Datastar Pro](https://data-star.dev/datastar_pro) license for the Rocket plugin.
+A Datastar **Rocket** version .8 web component wrapping [Tom Select](https://tom-select.js.org/).
+Both rockets require a [Datastar Pro](https://data-star.dev/datastar_pro) 
 
 ## Quick Start
 
@@ -95,4 +95,91 @@ Tom Select CSS is loaded globally via `<link>` tag. The component uses **light D
 
 ```html
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/css/tom-select.css" />
+```
+
+---
+
+## Rocket Tabulator Component RC.8  
+
+A Datastar **Rocket** web component wrapping [Tabulator 6.3](https://tabulator.info/). Defined in `tabulator-rocket.html`.
+
+### `<rocket-tabulator>`
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `columns` | string (JSON) | `[]` | Tabulator column definitions |
+| `data` | string (JSON) | `[]` | Row data array |
+| `height` | string | `"311px"` | CSS height for the grid |
+| `layout` | string | `"fitColumns"` | Tabulator layout mode |
+| `placeholder` | string | `"No Data"` | Empty-table message |
+| `movable-columns` | boolean | `false` | Allow column drag reorder |
+| `resizable-columns` | boolean | `true` | Allow column resize |
+| `enable-row-click` | boolean | `false` | Attach row click handlers |
+| `selectable-rows` | boolean | `false` | Show checkbox column for row selection |
+| `initial-sort` | string (JSON) | `[]` | Sort config `[{column, dir}]` |
+
+### Events
+
+| Event | Detail | Description |
+|-------|--------|-------------|
+| `tab-row-click` | `{ row }` | Fired on row click (when `enable-row-click` is true) |
+| `tab-rows-selected` | `{ rows }` | Fired on selection change (when `selectable-rows` is true) |
+| `tab-columns-changed` | `{ columns }` | Debounced 600ms on column move/resize/visibility change |
+
+### Usage Examples
+
+**Basic grid with filters and sorting:**
+```html
+<rocket-tabulator
+  columns='[{"title":"Name","field":"name","headerFilter":true}]'
+  data='[{"name":"Alice"},{"name":"Bob"}]'
+  height="320px"
+  movable-columns="true"
+  initial-sort='[{"column":"name","dir":"asc"}]'
+></rocket-tabulator>
+```
+
+**Row click with detail display:**
+```html
+<div data-signals:clicked="''">
+  <rocket-tabulator
+    columns='[{"title":"Name","field":"name"}]'
+    data='[{"name":"Alice"}]'
+    enable-row-click="true"
+    data-on:tab-row-click="$clicked = JSON.stringify(evt.detail.row)"
+  ></rocket-tabulator>
+  <span data-text="$clicked"></span>
+</div>
+```
+
+**Selectable rows with checkboxes:**
+```html
+<div data-signals:count="0">
+  <rocket-tabulator
+    columns='[{"title":"Name","field":"name"}]'
+    data='[{"name":"Alice"},{"name":"Bob"}]'
+    selectable-rows="true"
+    data-on:tab-rows-selected="$count = evt.detail.rows.length"
+  ></rocket-tabulator>
+  <span data-text="$count + ' selected'"></span>
+</div>
+```
+
+**Dynamic data swap:**
+```html
+<rocket-tabulator
+  columns='[{"title":"Name","field":"name"}]'
+  data='[{"name":"Alice"}]'
+  data-attr:data="$filteredData"
+></rocket-tabulator>
+```
+
+Use `data-attr:data` to bind a signal — the component calls `setData()` internally, preserving column state, sort, and filters.
+
+### CSS
+
+Tabulator CSS is loaded globally via `<link>` tag:
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/css/tabulator_modern.min.css" />
 ```
