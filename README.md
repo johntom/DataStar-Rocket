@@ -3,6 +3,8 @@
 A Datastar **Rocket** version .8 web component wrapping [Tom Select](https://tom-select.js.org/).
 Both rockets require a [Datastar Pro](https://data-star.dev/datastar_pro) 
 
+Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)
+
 ## Quick Start
 
 ```bash
