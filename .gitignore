@@ -1,1 +1,5 @@
 node_modules/
+static/
+.claude/
+rocketX.md
+config.json

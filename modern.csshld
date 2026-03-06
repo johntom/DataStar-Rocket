@@ -1,0 +1,244 @@
+/* ══════════════════════════════════════════════════════════════
+   Modern CSS Overhaul — Dylan Beattie Style
+   Save of work-in-progress before rollback.
+
+   Notes:
+   - Tom Select dropdownParent:'body' fix worked (add to buildConfig)
+   - Tom Select dark overrides worked
+   - Tabulator dark overrides did NOT take effect — needs investigation
+   - Dropped backdrop-filter (stacking context trapped dropdowns)
+   - Dropped opacity from scroll animations (faded card contents)
+   ══════════════════════════════════════════════════════════════ */
+
+/* Also requires this JS change in buildConfig():
+   dropdownParent: 'body',
+*/
+
+/* ── OKLCH Design Tokens ─────────────────────────────── */
+:root {
+  color-scheme: light dark;
+  interpolate-size: allow-keywords;
+
+  /* Palette – OKLCH for perceptual uniformity */
+  --brand:      oklch(0.55 0.20 260);   /* indigo */
+  --accent:     oklch(0.62 0.19 145);   /* green  */
+  --warn:       oklch(0.70 0.18  75);   /* amber  */
+  --danger:     oklch(0.55 0.22  30);   /* red    */
+
+  /* Surfaces & text – auto light/dark */
+  --bg:         light-dark(oklch(0.97 0.005 260), oklch(0.18 0.02 260));
+  --bg-card:    light-dark(oklch(0.99 0.003 260), oklch(0.22 0.02 260));
+  --border:     light-dark(oklch(0.85 0.01 260), oklch(0.40 0.02 260));
+  --text:       light-dark(oklch(0.20 0.02 260), oklch(0.92 0.01 260));
+  --text-muted: light-dark(oklch(0.45 0.02 260), oklch(0.70 0.02 260));
+
+  /* Output area */
+  --bg-output:  light-dark(oklch(0.95 0.01 260), oklch(0.22 0.03 260));
+}
+
+/* ── Reset & Base ────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  max-width: 720px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  color: var(--text);
+  background: var(--bg);
+}
+
+h1 {
+  margin-bottom: 0.25rem;
+  text-wrap: balance;
+}
+
+.subtitle {
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+  text-wrap: pretty;
+}
+
+hr {
+  margin: 2rem 0;
+  border: none;
+  border-top: 2px solid var(--border);
+}
+
+/* ── Cards ────────────────────────────────────────────── */
+.card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 4px oklch(0.20 0.02 260 / 0.08);
+  transition: box-shadow 0.2s, translate 0.2s;
+}
+.card:hover {
+  box-shadow: 0 4px 24px oklch(0.20 0.02 260 / 0.15);
+  translate: 0 -2px;
+}
+.card h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+  text-wrap: balance;
+}
+.card p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  text-wrap: pretty;
+}
+
+/* Slide-up on initial render (Chrome 117+) */
+@starting-style {
+  .card {
+    translate: 0 20px;
+  }
+}
+.card {
+  transition: translate 0.5s ease, box-shadow 0.2s;
+}
+
+/* Scroll-driven slide-up (Chrome 115+) */
+@supports (animation-timeline: view()) {
+  .card {
+    animation: card-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 30%;
+  }
+  @keyframes card-reveal {
+    from { translate: 0 16px; }
+    to   { translate: 0 0; }
+  }
+}
+
+/* ── Output areas ────────────────────────────────────── */
+.output {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-output);
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  transition: height 0.3s ease;
+  overflow: hidden;
+}
+
+/* ── Buttons ──────────────────────────────────────────── */
+button, .btn {
+  background: var(--brand);
+  color: oklch(1 0 0);
+  border: none;
+  border-radius: 6px;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+button:hover, .btn:hover {
+  background: color-mix(in oklch, var(--brand) 82%, white);
+}
+button:active, .btn:active {
+  background: color-mix(in oklch, var(--brand) 82%, black);
+}
+button:focus-visible, .btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ── Component blocks ────────────────────────────────── */
+rocket-tom-select {
+  display: block;
+  margin: 1rem 0;
+}
+rocket-tabulator {
+  display: block;
+  margin: 1rem 0;
+}
+
+/* ── Tom Select – dropdown appended to body ─────────── */
+.ts-wrapper .ts-dropdown {
+  z-index: 1000;
+}
+.ts-dropdown-content {
+  max-height: 300px !important;
+}
+
+/* ── Tom Select theme (auto light/dark) ──────────────── */
+.ts-wrapper .ts-control {
+  background: var(--bg-output) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+.ts-wrapper .ts-control input {
+  color: var(--text) !important;
+}
+.ts-wrapper .ts-dropdown {
+  background: light-dark(oklch(0.99 0.003 260), oklch(0.22 0.02 260)) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+.ts-wrapper .ts-dropdown .option {
+  color: var(--text) !important;
+}
+.ts-wrapper .ts-dropdown .active {
+  background: color-mix(in oklch, var(--brand) 30%, transparent) !important;
+  color: oklch(1 0 0) !important;
+}
+.ts-wrapper .ts-control .item {
+  background: color-mix(in oklch, var(--brand) 25%, transparent) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Tabulator dark-mode overrides ───────────────────── */
+@media (prefers-color-scheme: dark) {
+  /* Nuclear: force all text inside tabulator to white */
+  .tabulator,
+  .tabulator * {
+    color: #e8e8e8 !important;
+    border-color: #444 !important;
+  }
+  .tabulator {
+    background-color: #1e1e2e !important;
+  }
+  .tabulator .tabulator-header,
+  .tabulator-header .tabulator-col,
+  .tabulator .tabulator-header .tabulator-col {
+    background-color: #262638 !important;
+  }
+  .tabulator-row,
+  .tabulator .tabulator-tableholder .tabulator-table .tabulator-row {
+    background-color: #1e1e2e !important;
+  }
+  .tabulator-row.tabulator-row-even,
+  .tabulator .tabulator-tableholder .tabulator-table .tabulator-row.tabulator-row-even {
+    background-color: #222234 !important;
+  }
+  .tabulator-row:hover,
+  .tabulator .tabulator-tableholder .tabulator-table .tabulator-row:hover {
+    background-color: #2a2a40 !important;
+  }
+  .tabulator-cell,
+  .tabulator .tabulator-tableholder .tabulator-table .tabulator-row .tabulator-cell {
+    color: #e8e8e8 !important;
+    border-color: #444 !important;
+  }
+  .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input,
+  .tabulator-header-filter input {
+    background-color: #2a2a3a !important;
+    color: #e8e8e8 !important;
+    border-color: #444 !important;
+  }
+  .tabulator .tabulator-tableholder .tabulator-placeholder span {
+    color: #999 !important;
+  }
+  .tabulator .tabulator-footer,
+  .tabulator-footer {
+    background-color: #262638 !important;
+    color: #e8e8e8 !important;
+    border-color: #444 !important;
+  }
+}
