@@ -21,21 +21,51 @@ await app.register(fastifyStatic, {
 
 // ─── Sample Data ────────────────────────────────────────────────
 const FRUITS = [
-  { value: "apple", text: "Apple" },
-  { value: "banana", text: "Banana" },
-  { value: "cherry", text: "Cherry" },
-  { value: "dragonfruit", text: "Dragon Fruit" },
-  { value: "elderberry", text: "Elderberry" },
-  { value: "fig", text: "Fig" },
-  { value: "grape", text: "Grape" },
-  { value: "honeydew", text: "Honeydew" },
-  { value: "kiwi", text: "Kiwi" },
-  { value: "lemon", text: "Lemon" },
-  { value: "mango", text: "Mango" },
-  { value: "nectarine", text: "Nectarine" },
-  { value: "orange", text: "Orange" },
-  { value: "papaya", text: "Papaya" },
-  { value: "quince", text: "Quince" },
+  { value: "apple", text: "Apple", origin: "Central Asia", season: "Fall" },
+  {
+    value: "banana",
+    text: "Banana",
+    origin: "Southeast Asia",
+    season: "Year-round",
+  },
+  { value: "cherry", text: "Cherry", origin: "Europe", season: "Summer" },
+  {
+    value: "dragonfruit",
+    text: "Dragon Fruit",
+    origin: "Central America",
+    season: "Summer",
+  },
+  {
+    value: "elderberry",
+    text: "Elderberry",
+    origin: "Europe",
+    season: "Late Summer",
+  },
+  { value: "fig", text: "Fig", origin: "Mediterranean", season: "Late Summer" },
+  { value: "grape", text: "Grape", origin: "Near East", season: "Fall" },
+  {
+    value: "honeydew",
+    text: "Honeydew",
+    origin: "West Africa",
+    season: "Summer",
+  },
+  { value: "kiwi", text: "Kiwi", origin: "China", season: "Winter" },
+  { value: "lemon", text: "Lemon", origin: "South Asia", season: "Year-round" },
+  { value: "mango", text: "Mango", origin: "South Asia", season: "Summer" },
+  { value: "nectarine", text: "Nectarine", origin: "China", season: "Summer" },
+  {
+    value: "orange",
+    text: "Orange",
+    origin: "Southeast Asia",
+    season: "Winter",
+  },
+  {
+    value: "papaya",
+    text: "Papaya",
+    origin: "Central America",
+    season: "Year-round",
+  },
+  { value: "quince", text: "Quince", origin: "Caucasus", season: "Fall" },
 ];
 
 const USERS = [
@@ -195,6 +225,11 @@ app.get("/", async (request, reply) => {
       display: block;
       margin: 1rem 0;
     }
+    .ts-wrapper .ts-control,
+    .ts-wrapper .ts-control input,
+    .ts-wrapper .ts-dropdown .option {
+      color: #1a1a2e;
+    }
   </style>
 </head>
 <body>
@@ -205,12 +240,13 @@ app.get("/", async (request, reply) => {
   <!-- Rocket component definition                           -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <template data-rocket:rocket-tom-select
-    data-props:placeholder="string|=Select..."
-    data-props:max-items="int|min:1|=1"
-    data-props:options="string|="
-    data-props:value="string|="
-    data-props:allow-create="boolean|=false"
-    data-props:search-url="string|="
+    data-prop:placeholder="str='Select...'"
+    data-prop:max-items="int(min(1))"
+    data-prop:options="str"
+    data-prop:value="str"
+    data-prop:allow-create="bool"
+    data-prop:detail-field="str"
+    data-prop:search-url="str"
     data-import:TomSelect__iife="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"
   >
     <script>
@@ -263,6 +299,29 @@ app.get("/", async (request, reply) => {
           config.labelField = 'text'
           config.valueField = 'value'
           config.searchField = ['text']
+        }
+
+        var df = '' + ($$detailField || '')
+        if (df) {
+          var fields = df.split(',').map(function(f){ return f.trim() })
+          config.searchField = ['text'].concat(fields)
+          config.render = {
+            option: function(data, escape) {
+              var html = '<div style="display:flex;gap:.5rem">'
+                + '<span style="flex:1">' + escape(data.text) + '</span>'
+              for (var i = 0; i < fields.length; i++) {
+                html += '<span style="color:#888;font-size:.8em;min-width:5rem;text-align:right">' + escape(data[fields[i]] || '') + '</span>'
+              }
+              return html + '</div>'
+            },
+            item: function(data, escape) {
+              var parts = [escape(data.text)]
+              for (var i = 0; i < fields.length; i++) {
+                if (data[fields[i]]) parts.push(escape(data[fields[i]]))
+              }
+              return '<div>' + parts.join(' · ') + '</div>'
+            }
+          }
         }
 
         var sUrl = '' + ($$searchUrl || '')
@@ -332,12 +391,13 @@ app.get("/", async (request, reply) => {
   <!-- Example 1: Single Select with Static Options          -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div class="card" data-signals:selectedFruit="''">
-    <h2>Single Select — Static Options</h2>
-    <p>Pick one fruit from the list.</p>
+    <h2>Single Select — Three-Column Dropdown</h2>
+    <p>Pick one fruit. Dropdown shows origin and season. Selected pill shows all three.</p>
 
     <rocket-tom-select
       placeholder="Pick a fruit..."
       options='${JSON.stringify(FRUITS)}'
+      detail-field="origin,season"
       data-on:ts-change="$selectedFruit = evt.detail.value"
     ></rocket-tom-select>
 
@@ -401,7 +461,7 @@ app.get("/", async (request, reply) => {
         { value: "datastar", text: "Datastar" },
         { value: "fastify", text: "Fastify" },
       ])}'
-      data-on:ts-change="$tags = evt.detail.value; @get('/api/save-tags')"
+      data-on:ts-change="$tags = evt.detail.value; @post('/api/save-tags')"
     ></rocket-tom-select>
 
     <div id="tag-result" class="output">
@@ -417,15 +477,16 @@ app.get("/", async (request, reply) => {
   <!-- Rocket Tabulator component definition                  -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <template data-rocket:rocket-tabulator
-    data-props:columns="string|="
-    data-props:data="string|="
-    data-props:height="string|=311px"
-    data-props:layout="string|=fitColumns"
-    data-props:placeholder="string|=No Data"
-    data-props:movable-columns="boolean|=false"
-    data-props:resizable-columns="boolean|=true"
-    data-props:enable-row-click="boolean|=false"
-    data-props:initial-sort="string|="
+    data-prop:columns="str"
+    data-prop:data="str"
+    data-prop:height="str='311px'"
+    data-prop:layout="str='fitColumns'"
+    data-prop:placeholder="str='No Data'"
+    data-prop:movable-columns="bool"
+    data-prop:resizable-columns="bool=true"
+    data-prop:enable-row-click="bool"
+    data-prop:selectable-rows="bool"
+    data-prop:initial-sort="str"
     data-import:Tabulator__iife="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"
   >
     <script>
@@ -467,6 +528,21 @@ app.get("/", async (request, reply) => {
         var rows = parseJSON($$data)
         var sort = parseJSON($$initialSort)
 
+        // Prepend checkbox select column if selectable-rows is on
+        if (!!($$selectableRows)) {
+          cols.unshift({
+            formatter: 'rowSelection',
+            titleFormatter: 'rowSelection',
+            headerSort: false,
+            resizable: false,
+            frozen: true,
+            width: 40,
+            hozAlign: 'center',
+            headerHozAlign: 'center',
+            cssClass: 'tabulator-row-select-col'
+          })
+        }
+
         var config = {
           data:             rows,
           layout:           '' + ($$layout || 'fitColumns'),
@@ -475,6 +551,10 @@ app.get("/", async (request, reply) => {
           resizableColumns: !!($$resizableColumns),
           placeholder:      '' + ($$placeholder || 'No Data'),
           columns:          cols
+        }
+
+        if (!!($$selectableRows)) {
+          config.selectableRows = true
         }
 
         if (sort.length) {
@@ -506,6 +586,19 @@ app.get("/", async (request, reply) => {
         tabInstance.on('columnMoved',             emitColumnState)
         tabInstance.on('columnResized',           emitColumnState)
         tabInstance.on('columnVisibilityChanged', emitColumnState)
+
+        if (!!($$selectableRows)) {
+          function emitSelection() {
+            var selected = tabInstance.getSelectedData()
+            el.dispatchEvent(new CustomEvent('tab-rows-selected', {
+              detail: { rows: selected },
+              bubbles: true,
+              composed: true
+            }))
+          }
+          tabInstance.on('rowSelected',   emitSelection)
+          tabInstance.on('rowDeselected', emitSelection)
+        }
       })
 
       // ── watch data prop for dynamic swaps ─────────────────────
@@ -609,7 +702,54 @@ app.get("/", async (request, reply) => {
   </div>
 
   <!-- ═══════════════════════════════════════════════════════ -->
-  <!-- Example 7: Dynamic Data Swap                           -->
+  <!-- Example 7: Selectable Rows + Row Click Dialog          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" style="position:relative" data-signals:selectedCount="0" data-signals:selectedIds="''" data-signals:dlgName="''" data-signals:dlgDept="''" data-signals:dlgSalary="''" data-signals:dlgOpen="false">
+    <h2>Checkbox Select + Row Click Dialog</h2>
+    <p>Use checkboxes to select rows. Click a row to open a detail dialog.</p>
+
+    <rocket-tabulator
+      columns='${JSON.stringify([
+        { title: "ID", field: "id", width: 60 },
+        { title: "Name", field: "name" },
+        { title: "Department", field: "department" },
+        {
+          title: "Salary",
+          field: "salary",
+          hozAlign: "right",
+          formatter: "money",
+          formatterParams: { thousand: ",", symbol: "$" },
+        },
+        { title: "Start Date", field: "startDate", width: 110 },
+      ])}'
+      data='${JSON.stringify(EMPLOYEES)}'
+      height="320px"
+      selectable-rows="true"
+      enable-row-click="true"
+      data-on:tab-rows-selected="$selectedCount = evt.detail.rows.length; $selectedIds = evt.detail.rows.map(function(r){return r.id}).join(', ')"
+      data-on:tab-row-click="$dlgName = evt.detail.row.name; $dlgDept = evt.detail.row.department; $dlgSalary = '$' + Number(evt.detail.row.salary).toLocaleString(); $dlgOpen = true"
+    ></rocket-tabulator>
+
+    <div class="output">
+      Selected rows: <strong data-text="$selectedCount"></strong>
+      &nbsp;— IDs: <span data-text="$selectedIds || '(none)'"></span>
+    </div>
+
+    <!-- Dialog — centered over the grid via position:relative on .card -->
+    <div data-show="$dlgOpen" style="position:absolute;inset:0;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:10;border-radius:8px">
+      <div style="background:#fff;border-radius:6px;padding:.75rem 1rem;width:220px;box-shadow:0 4px 16px rgba(0,0,0,.18);font-size:.82rem">
+        <h3 style="margin:0 0 .5rem;font-size:.9rem">Employee Detail</h3>
+        <p style="margin:.2rem 0"><strong>Name:</strong> <span data-text="$dlgName"></span></p>
+        <p style="margin:.2rem 0"><strong>Dept:</strong> <span data-text="$dlgDept"></span></p>
+        <p style="margin:.2rem 0"><strong>Salary:</strong> <span data-text="$dlgSalary"></span></p>
+        <button style="margin-top:.5rem;padding:.25rem .8rem;border:1px solid #ccc;border-radius:3px;cursor:pointer;background:#f0f0f0;font-size:.78rem"
+                data-on:click="$dlgOpen = false">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 8: Dynamic Data Swap                           -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div class="card">
     <script type="application/json" data-signals>
@@ -652,11 +792,10 @@ app.get("/", async (request, reply) => {
 });
 
 // ─── Tag Save Endpoint (SSE) ───────────────────────────────────
-app.get("/api/save-tags", async (request, reply) => {
-  const tags = request.query.tags || request.headers["datastar-signals"];
+app.post("/api/save-tags", async (request, reply) => {
+  const signals = JSON.parse(request.headers["datastar-signals"] || "{}");
   reply.datastar((sse) => {
-    const parsed = tags ? JSON.parse(tags) : {};
-    const tagList = (parsed.tags || "").split(",").filter(Boolean);
+    const tagList = (signals.tags || "").split(",").filter(Boolean);
     sse.patchElements(
       /* html */ `
       <div id="tag-result" class="output" style="border-left: 3px solid #22c55e;">

@@ -11,13 +11,14 @@
       data-on:ts-change="$selectedFruit = evt.detail.value"
     ></rocket-tom-select>
 
-  Props:
-    placeholder  - Placeholder text (string, default: "Select...")
-    max-items    - Max selectable items (int, default: 1)
-    options      - JSON string of [{value, text}] objects (string, passed as attribute)
-    value        - Current value, comma-separated for multi (string)
-    allow-create - Allow user to create new items (boolean, default: false)
-    search-url   - Backend URL for remote search (string, optional)
+  Props (RC.8 data-prop syntax):
+    placeholder  - Placeholder text (str, default: "Select...")
+    max-items    - Max selectable items (int, min 1, default: 1)
+    options      - JSON string of [{value, text}] objects (str)
+    value        - Current value, comma-separated for multi (str)
+    allow-create - Allow user to create new items (bool, default: false)
+    detail-field - Comma-separated extra field names for multi-column dropdown (str)
+    search-url   - Backend URL for remote search (str)
 
   Emits:
     ts-change CustomEvent with detail.value (string)
@@ -28,12 +29,13 @@
 -->
 
 <template data-rocket:rocket-tom-select
-  data-props:placeholder="string|=Select..."
-  data-props:max-items="int|min:1|=1"
-  data-props:options="string|="
-  data-props:value="string|="
-  data-props:allow-create="boolean|=false"
-  data-props:search-url="string|="
+  data-prop:placeholder="str='Select...'"
+  data-prop:max-items="int(min(1))"
+  data-prop:options="str"
+  data-prop:value="str"
+  data-prop:allow-create="bool"
+  data-prop:detail-field="str"
+  data-prop:search-url="str"
   data-import:TomSelect__iife="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"
 >
   <script>
@@ -85,6 +87,29 @@
         config.labelField = 'text'
         config.valueField = 'value'
         config.searchField = ['text']
+      }
+
+      var df = '' + ($$detailField || '')
+      if (df) {
+        var fields = df.split(',').map(function(f){ return f.trim() })
+        config.searchField = ['text'].concat(fields)
+        config.render = {
+          option: function(data, escape) {
+            var html = '<div style="display:flex;gap:.5rem">'
+              + '<span style="flex:1">' + escape(data.text) + '</span>'
+            for (var i = 0; i < fields.length; i++) {
+              html += '<span style="color:#888;font-size:.8em;min-width:5rem;text-align:right">' + escape(data[fields[i]] || '') + '</span>'
+            }
+            return html + '</div>'
+          },
+          item: function(data, escape) {
+            var parts = [escape(data.text)]
+            for (var i = 0; i < fields.length; i++) {
+              if (data[fields[i]]) parts.push(escape(data[fields[i]]))
+            }
+            return '<div>' + parts.join(' · ') + '</div>'
+          }
+        }
       }
 
       var sUrl = '' + ($$searchUrl || '')
