@@ -3,13 +3,20 @@
 A Datastar **Rocket** version .8 web component wrapping [Tom Select](https://tom-select.js.org/).
 Both rockets require a [Datastar Pro](https://data-star.dev/datastar_pro) 
 
-Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)
+to run demo
+1. npm install
+2. copy your datastar-pro.js file to the static directory
+3. 
+<!--Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)-->
 
 ## Quick Start
 
 ```bash
 npm install
-npm run dev
+ copy your datastar-pro.js file \static 
+npm run dev 
+or
+npm run start
 # → http://localhost:3000
 ```
 
