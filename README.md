@@ -29,6 +29,7 @@ npm run start
 | `value` | string | `""` | Current value (comma-separated for multi) |
 | `allow-create` | boolean | `false` | Allow creating new items |
 | `search-url` | string | `""` | Backend URL for remote search |
+| `check-options` | boolean | `false` | Checkbox multi-select with Apply/Clear buttons |
 
 ### Events
 
@@ -67,6 +68,18 @@ The component dispatches a `change` CustomEvent with `detail.value` containing t
 ```
 
 The search endpoint should accept `?q=query` and return JSON: `[{value, text}, ...]`
+
+**Checkbox multi-select with Apply/Clear:**
+```html
+<rocket-tom-select
+  placeholder="All"
+  check-options
+  options='[{"value":"1","text":"Open"},{"value":"2","text":"Closed"}]'
+  data-on:ts-change="$status = evt.detail.value; @get('/api/search')"
+></rocket-tom-select>
+```
+
+When `check-options` is set, the dropdown shows checkboxes next to each option with Apply and Clear buttons pinned at the bottom. Selections are not committed until Apply is clicked. Clear deselects all and fires the change event. Use hyphenated `check-options` (not `checkbox`) to avoid conflicts with Datastar signal binding.
 
 **Creatable tags with backend sync:**
 ```html
@@ -181,6 +194,51 @@ A Datastar **Rocket** web component wrapping [Tabulator 6.3](https://tabulator.i
 ```
 
 Use `data-attr:data` to bind a signal — the component calls `setData()` internally, preserving column state, sort, and filters.
+
+### Custom Header Filter: `checklistFilter`
+
+A built-in multi-select checklist header filter with search, checkboxes, and Apply/Clear buttons. Use it by setting `headerFilter: "checklistFilter"` in a column definition — the component replaces the string with the actual editor function before Tabulator init.
+
+```javascript
+{
+  title: "Dept",
+  field: "DeptDesc",
+  width: 90,
+  headerFilter: "checklistFilter",  // activates checklist dropdown
+  headerFilterFunc: "in"             // Tabulator built-in array filter
+}
+```
+
+**Features:**
+- Auto-populates unique values from column data
+- Search box to narrow the list
+- Checkboxes for multi-selection
+- Apply button commits the filter, Clear button resets it
+- Display shows "N selected" when active
+- Dropdown appended to `document.body` to escape header `overflow:hidden`
+
+### Column Picker: `_showColPicker(anchorEl)`
+
+A built-in column picker with visibility checkboxes and drag-to-reorder. Call it from any button via the element method:
+
+```html
+<button onclick="document.getElementById('my-grid')._showColPicker(this)">
+  Columns
+</button>
+<rocket-tabulator id="my-grid" columns='...' data='...'></rocket-tabulator>
+```
+
+**Features:**
+- Checkboxes to toggle column visibility
+- Drag handles (⠿) to reorder columns via drag-and-drop
+- Calls `table.moveColumn()` to reorder the grid on drop
+- Emits `tab-columns-changed` event after reorder or visibility change
+- Auto-column layout based on field count:
+  - `< 20` fields → 1 column
+  - `20–39` fields → 2 columns
+  - `40+` fields → 3 columns
+- Toggle: clicking the button again closes the picker
+- Appended to `document.body` with `position:fixed`
 
 ### CSS
 
