@@ -11,31 +11,33 @@
       data-on:ts-change="$selectedFruit = evt.detail.value"
     ></rocket-tom-select>
 
-  Props (RC.8 data-prop syntax):
-    placeholder  - Placeholder text (str, default: "Select...")
-    max-items    - Max selectable items (int, min 1, default: 1)
-    options      - JSON string of [{value, text}] objects (str)
-    value        - Current value, comma-separated for multi (str)
-    allow-create - Allow user to create new items (bool, default: false)
-    detail-field - Comma-separated extra field names for multi-column dropdown (str)
-    search-url   - Backend URL for remote search (str)
+  Props (data-props codec syntax):
+    placeholder   - Placeholder text (string, default: "Select...")
+    max-items     - Max selectable items (int, min 1, default: 1)
+    options       - JSON string of [{value, text}] objects (string)
+    value         - Current value, comma-separated for multi (string)
+    allow-create  - Allow user to create new items (boolean, default: false)
+    detail-field  - Comma-separated extra field names for multi-column dropdown (string)
+    search-url    - Backend URL for remote search (string)
+    check-options - Enable checkbox multi-select with Apply/Clear buttons (boolean, default: false)
 
   Emits:
     ts-change CustomEvent with detail.value (string)
     Listen via: data-on:ts-change="$mySignal = evt.detail.value"
 
-  Note: options uses string type (not json) to avoid Datastar signal proxy
+  Note: options uses string codec (not json) to avoid Datastar signal proxy
   issues with arrays. The JSON is parsed inside the component script.
 -->
 
 <template data-rocket:rocket-tom-select
-  data-prop:placeholder="str='Select...'"
-  data-prop:max-items="int(min(1))"
-  data-prop:options="str"
-  data-prop:value="str"
-  data-prop:allow-create="bool"
-  data-prop:detail-field="str"
-  data-prop:search-url="str"
+  data-props:placeholder="string|=Select..."
+  data-props:max-items="int|min:1|=1"
+  data-props:options="string|="
+  data-props:value="string|="
+  data-props:allow-create="boolean|=false"
+  data-props:detail-field="string|="
+  data-props:search-url="string|="
+  data-props:check-options="boolean|=false"
   data-import:TomSelect__iife="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"
 >
   <script>
@@ -79,7 +81,14 @@
         }
       }
 
-      if (+($$maxItems || 1) > 1) {
+      if (!!($$checkOptions)) {
+        config.maxItems = 50
+        config.plugins.checkbox_options = {}
+        config.plugins.remove_button = { title: 'Remove' }
+        // Suppress onChange — Apply button will fire it
+        config._realOnChange = config.onChange
+        config.onChange = function () {}
+      } else if (+($$maxItems || 1) > 1) {
         config.plugins.remove_button = { title: 'Remove' }
       }
 
@@ -133,7 +142,43 @@
     effect(function() {
       if (!$$selectEl || !TomSelect) return
       if (tsInstance) return
-      tsInstance = new TomSelect($$selectEl, buildConfig())
+      var cfg = buildConfig()
+      tsInstance = new TomSelect($$selectEl, cfg)
+      // Append Apply / Clear buttons for checkbox mode
+      if (cfg._realOnChange) {
+        var fireChange = cfg._realOnChange
+        var bar = document.createElement('div')
+        bar.style.cssText = 'display:flex;gap:4px;padding:4px 6px;border-top:1px solid var(--clr-border,#ddd);'
+        var applyBtn = document.createElement('button')
+        applyBtn.type = 'button'
+        applyBtn.textContent = 'Apply'
+        applyBtn.style.cssText = 'flex:1;padding:2px 6px;font-size:11px;cursor:pointer;background:#4472c4;color:#fff;border:1px solid #3560a8;border-radius:3px;'
+        var clearBtn = document.createElement('button')
+        clearBtn.type = 'button'
+        clearBtn.textContent = 'Clear'
+        clearBtn.style.cssText = 'flex:1;padding:2px 6px;font-size:11px;cursor:pointer;background:var(--clr-bg,#f5f5f5);color:var(--clr-text,#333);border:1px solid var(--clr-border,#ccc);border-radius:3px;'
+        var ts = tsInstance
+        applyBtn.addEventListener('click', function (e) {
+          e.stopPropagation()
+          fireChange.call(ts, ts.getValue())
+          ts.close()
+        })
+        clearBtn.addEventListener('click', function (e) {
+          e.stopPropagation()
+          ts.clear(true)
+          fireChange.call(ts, '')
+          ts.close()
+        })
+        bar.appendChild(applyBtn)
+        bar.appendChild(clearBtn)
+        tsInstance.dropdown.style.display = 'flex'
+        tsInstance.dropdown.style.flexDirection = 'column'
+        tsInstance.dropdown_content.style.maxHeight = '170px'
+        tsInstance.dropdown_content.style.flex = '1'
+        tsInstance.dropdown.appendChild(bar)
+        tsInstance.close()
+        tsInstance.blur()
+      }
     })
 
     var prevOptionsStr = ''

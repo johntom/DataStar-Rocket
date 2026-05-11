@@ -6,6 +6,7 @@
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
 // import { Datastar } from "datastar-fastify";
 // import { Datastar } from "@johntom/datastar-fastify";
 //import { Datastar } from "@johntom/datastar-fastify-sdk";
@@ -18,6 +19,9 @@ await app.register(fastifyStatic, {
   root: resolve("static"),
   prefix: "/static/",
 });
+
+const tomSelectTemplate = readFileSync(resolve("tom-select-rocket.html"), "utf8");
+const tabulatorTemplate = readFileSync(resolve("tabulator-rocket.html"), "utf8");
 
 // ─── Sample Data ────────────────────────────────────────────────
 const FRUITS = [
@@ -237,155 +241,9 @@ app.get("/", async (request, reply) => {
   <p class="subtitle">Datastar Rocket web component wrapping Tom Select</p>
 
   <!-- ═══════════════════════════════════════════════════════ -->
-  <!-- Rocket component definition                           -->
+  <!-- Rocket component definition (loaded from tom-select-rocket.html) -->
   <!-- ═══════════════════════════════════════════════════════ -->
-  <template data-rocket:rocket-tom-select
-    data-prop:placeholder="str='Select...'"
-    data-prop:max-items="int(min(1))"
-    data-prop:options="str"
-    data-prop:value="str"
-    data-prop:allow-create="bool"
-    data-prop:detail-field="str"
-    data-prop:search-url="str"
-    data-import:TomSelect__iife="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"
-  >
-    <script>
-      let tsInstance = null
-
-      function parseOptions() {
-        try {
-          const raw = '' + ($$options || '')
-          return raw ? JSON.parse(raw) : []
-        } catch(e) {
-          return []
-        }
-      }
-
-      function buildConfig() {
-        const opts = parseOptions()
-        const config = {
-          placeholder: '' + ($$placeholder || ''),
-          maxItems: +($$maxItems || 1),
-          maxOptions: null,
-          create: !!($$allowCreate) ? function(input, callback) { var item = { value: input, text: input }; callback(item) } : false,
-          plugins: {},
-          onInitialize: function () {
-            var v = '' + ($$value || '')
-            if (v) {
-              this.setValue(v.split(','), true)
-            }
-          },
-          onChange: function (val) {
-            try {
-              var strVal = Array.isArray(val) ? val.join(',') : ('' + (val || ''))
-              $$value = strVal
-              el.dispatchEvent(new CustomEvent('ts-change', {
-                detail: { value: strVal },
-                bubbles: true,
-                composed: true
-              }))
-            } catch(e) {
-              console.error('[TomSelect onChange]', e)
-            }
-          }
-        }
-
-        if (+($$maxItems || 1) > 1) {
-          config.plugins.remove_button = { title: 'Remove' }
-        }
-
-        if (opts.length > 0) {
-          config.options = opts
-          config.labelField = 'text'
-          config.valueField = 'value'
-          config.searchField = ['text']
-        }
-
-        var df = '' + ($$detailField || '')
-        if (df) {
-          var fields = df.split(',').map(function(f){ return f.trim() })
-          config.searchField = ['text'].concat(fields)
-          config.render = {
-            option: function(data, escape) {
-              var html = '<div style="display:flex;gap:.5rem">'
-                + '<span style="flex:1">' + escape(data.text) + '</span>'
-              for (var i = 0; i < fields.length; i++) {
-                html += '<span style="color:#888;font-size:.8em;min-width:5rem;text-align:right">' + escape(data[fields[i]] || '') + '</span>'
-              }
-              return html + '</div>'
-            },
-            item: function(data, escape) {
-              var parts = [escape(data.text)]
-              for (var i = 0; i < fields.length; i++) {
-                if (data[fields[i]]) parts.push(escape(data[fields[i]]))
-              }
-              return '<div>' + parts.join(' · ') + '</div>'
-            }
-          }
-        }
-
-        var sUrl = '' + ($$searchUrl || '')
-        if (sUrl) {
-          config.load = function (query, callback) {
-            if (!query.length) return callback()
-            fetch(sUrl + '?q=' + encodeURIComponent(query))
-              .then(function(res) { return res.json() })
-              .then(function(data) { callback(data) })
-              .catch(function() { callback() })
-          }
-          config.labelField = 'text'
-          config.valueField = 'value'
-          config.searchField = ['text']
-        }
-
-        return config
-      }
-
-      effect(function() {
-        if (!$$selectEl || !TomSelect) return
-        if (tsInstance) return
-        tsInstance = new TomSelect($$selectEl, buildConfig())
-      })
-
-      var prevOptionsStr = ''
-      effect(function() {
-        if (!tsInstance) return
-        var optStr = '' + ($$options || '')
-        if (optStr !== prevOptionsStr) {
-          prevOptionsStr = optStr
-          try {
-            var parsed = optStr ? JSON.parse(optStr) : []
-            tsInstance.clearOptions()
-            tsInstance.addOptions(parsed)
-            tsInstance.refreshOptions(false)
-          } catch(e) {}
-        }
-      })
-
-      var lastSyncedValue = ''
-      effect(function() {
-        if (!tsInstance) return
-        var newVal = '' + ($$value || '')
-        if (newVal !== lastSyncedValue) {
-          lastSyncedValue = newVal
-          if (newVal) {
-            tsInstance.setValue(newVal.split(','), true)
-          } else {
-            tsInstance.clear(true)
-          }
-        }
-      })
-
-      onCleanup(function() {
-        if (tsInstance) {
-          tsInstance.destroy()
-          tsInstance = null
-        }
-      })
-    </script>
-
-    <select data-ref="selectEl"></select>
-  </template>
+  ${tomSelectTemplate}
 
   <!-- ═══════════════════════════════════════════════════════ -->
   <!-- Example 1: Single Select with Static Options          -->
@@ -474,160 +332,9 @@ app.get("/", async (request, reply) => {
   <p class="subtitle">Datastar Rocket web component wrapping Tabulator 6.3</p>
 
   <!-- ═══════════════════════════════════════════════════════ -->
-  <!-- Rocket Tabulator component definition                  -->
+  <!-- Rocket Tabulator component definition (loaded from tabulator-rocket.html) -->
   <!-- ═══════════════════════════════════════════════════════ -->
-  <template data-rocket:rocket-tabulator
-    data-prop:columns="str"
-    data-prop:data="str"
-    data-prop:height="str='311px'"
-    data-prop:layout="str='fitColumns'"
-    data-prop:placeholder="str='No Data'"
-    data-prop:movable-columns="bool"
-    data-prop:resizable-columns="bool=true"
-    data-prop:enable-row-click="bool"
-    data-prop:selectable-rows="bool"
-    data-prop:initial-sort="str"
-    data-import:Tabulator__iife="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"
-  >
-    <script>
-      var tabInstance = null
-      var tabReady = null  // promise resolved on tableBuilt
-      var _colTimer = null
-
-      function parseJSON(sig) {
-        try {
-          var raw = '' + (sig || '')
-          return raw ? JSON.parse(raw) : []
-        } catch(e) {
-          return []
-        }
-      }
-
-      function emitColumnState() {
-        clearTimeout(_colTimer)
-        _colTimer = setTimeout(function () {
-          if (!tabInstance) return
-          var cols = tabInstance.getColumns()
-            .filter(function (c) { return !!c.getField() })
-            .map(function (c) {
-              return { field: c.getField(), visible: c.isVisible(), width: c.getWidth() }
-            })
-          el.dispatchEvent(new CustomEvent('tab-columns-changed', {
-            detail: { columns: cols },
-            bubbles: true,
-            composed: true
-          }))
-        }, 600)
-      }
-
-      effect(function() {
-        if (!$$tableEl || !Tabulator) return
-        if (tabInstance) return
-
-        var cols = parseJSON($$columns)
-        var rows = parseJSON($$data)
-        var sort = parseJSON($$initialSort)
-
-        // Prepend checkbox select column if selectable-rows is on
-        if (!!($$selectableRows)) {
-          cols.unshift({
-            formatter: 'rowSelection',
-            titleFormatter: 'rowSelection',
-            headerSort: false,
-            resizable: false,
-            frozen: true,
-            width: 40,
-            hozAlign: 'center',
-            headerHozAlign: 'center',
-            cssClass: 'tabulator-row-select-col'
-          })
-        }
-
-        var config = {
-          data:             rows,
-          layout:           '' + ($$layout || 'fitColumns'),
-          height:           '' + ($$height || '311px'),
-          movableColumns:   !!($$movableColumns),
-          resizableColumns: !!($$resizableColumns),
-          placeholder:      '' + ($$placeholder || 'No Data'),
-          columns:          cols
-        }
-
-        if (!!($$selectableRows)) {
-          config.selectableRows = true
-        }
-
-        if (sort.length) {
-          config.initialSort = sort
-        }
-
-        if (!!($$enableRowClick)) {
-          config.rowFormatter = function (row) {
-            var rowEl = row.getElement()
-            rowEl.style.cursor = 'pointer'
-            rowEl.addEventListener('click', function () {
-              el.dispatchEvent(new CustomEvent('tab-row-click', {
-                detail: { row: row.getData() },
-                bubbles: true,
-                composed: true
-              }))
-            })
-          }
-        }
-
-        tabInstance = new Tabulator($$tableEl, config)
-
-        // seed prevDataStr so the data-watch effect only fires on real changes
-        prevDataStr = '' + ($$data || '')
-
-        tabReady = new Promise(function(resolve) {
-          tabInstance.on('tableBuilt', resolve)
-        })
-        tabInstance.on('columnMoved',             emitColumnState)
-        tabInstance.on('columnResized',           emitColumnState)
-        tabInstance.on('columnVisibilityChanged', emitColumnState)
-
-        if (!!($$selectableRows)) {
-          function emitSelection() {
-            var selected = tabInstance.getSelectedData()
-            el.dispatchEvent(new CustomEvent('tab-rows-selected', {
-              detail: { rows: selected },
-              bubbles: true,
-              composed: true
-            }))
-          }
-          tabInstance.on('rowSelected',   emitSelection)
-          tabInstance.on('rowDeselected', emitSelection)
-        }
-      })
-
-      // ── watch data prop for dynamic swaps ─────────────────────
-      var prevDataStr = ''
-      effect(function() {
-        if (!tabInstance) return
-        var dataStr = '' + ($$data || '')
-        if (dataStr !== prevDataStr) {
-          prevDataStr = dataStr
-          tabReady.then(function() {
-            try {
-              var parsed = dataStr ? JSON.parse(dataStr) : []
-              tabInstance.setData(parsed)
-            } catch(e) {}
-          })
-        }
-      })
-
-      onCleanup(function() {
-        clearTimeout(_colTimer)
-        if (tabInstance) {
-          tabInstance.destroy()
-          tabInstance = null
-        }
-      })
-    <\/script>
-
-    <div data-ref="tableEl" style="width:100%"></div>
-  </template>
+  ${tabulatorTemplate}
 
   <!-- ═══════════════════════════════════════════════════════ -->
   <!-- Example 5: Basic Tabulator Grid                        -->

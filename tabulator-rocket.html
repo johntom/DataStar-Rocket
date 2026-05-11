@@ -14,46 +14,232 @@
       data-on:tab-row-click="$clicked = JSON.stringify(evt.detail.row)"
     ></rocket-tabulator>
 
-  Props (RC.8 data-prop syntax):
-    columns            - JSON string of Tabulator column definitions (str)
-    data               - JSON string of row data array (str)
-    height             - CSS height for the grid (str, default: "311px")
-    layout             - Tabulator layout mode (str, default: "fitColumns")
-    placeholder        - Empty-table message (str, default: "No Data")
-    movable-columns    - Allow column drag reorder (bool, default: false)
-    resizable-columns  - Allow column resize (bool, default: true)
-    enable-row-click   - Attach row click handlers (bool, default: false)
-    selectable-rows    - Show checkbox column for row selection (bool, default: false)
-    initial-sort       - JSON string of [{column, dir}] sort config (str)
+  Props (data-props codec syntax):
+    columns            - JSON string of Tabulator column definitions (string)
+    data               - JSON string of row data array (string)
+    height             - CSS height for the grid (string, default: "311px")
+    layout             - Tabulator layout mode (string, default: "fitColumns")
+    placeholder        - Empty-table message (string, default: "No Data")
+    movable-columns    - Allow column drag reorder (boolean, default: false)
+    resizable-columns  - Allow column resize (boolean, default: true)
+    enable-row-click   - Attach row click handlers (boolean, default: false)
+    selectable-rows    - Show row selection checkboxes (boolean, default: false)
+    initial-sort       - JSON string of [{column, dir}] sort config (string)
 
   Emits:
     tab-row-click         - CustomEvent with detail.row (object) on row click
-    tab-rows-selected     - CustomEvent with detail.rows (array of row data) on selection change
     tab-columns-changed   - CustomEvent with detail.columns ([{field, visible, width}])
                             debounced 600ms on column move/resize/visibility change
 
-  Note: columns and data use string type (not json) to avoid Datastar signal
+  Methods (on the element):
+    _showColPicker(anchorEl)  - Toggle column picker popup (visibility + drag reorder)
+                                Auto-columns: 1 col <20 fields, 2 cols 20-39, 3 cols 40+
+    _tabInstance              - Direct access to the Tabulator instance
+
+  Note: columns and data use string codec (not json) to avoid Datastar signal
   proxy issues with arrays. JSON is parsed inside the component script.
 -->
 
 <template
     data-rocket:rocket-tabulator
-    data-prop:columns="str"
-    data-prop:data="str"
-    data-prop:height="str='311px'"
-    data-prop:layout="str='fitColumns'"
-    data-prop:placeholder="str='No Data'"
-    data-prop:movable-columns="bool"
-    data-prop:resizable-columns="bool=true"
-    data-prop:enable-row-click="bool"
-    data-prop:selectable-rows="bool"
-    data-prop:initial-sort="str"
+    data-props:columns="string|="
+    data-props:data="string|="
+    data-props:height="string|=311px"
+    data-props:layout="string|=fitColumns"
+    data-props:placeholder="string|=No Data"
+    data-props:movable-columns="boolean|=false"
+    data-props:resizable-columns="boolean|=true"
+    data-props:enable-row-click="boolean|=false"
+    data-props:selectable-rows="boolean|=false"
+    data-props:initial-sort="string|="
+    data-props:row-index="string|="
     data-import:Tabulator__iife="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"
 >
     <script>
         var tabInstance = null;
         var tabReady = null; // promise resolved on tableBuilt
         var _colTimer = null;
+
+        // ── Custom "checklistFilter" header filter editor ────────
+        // Usage: headerFilter:"checklistFilter", headerFilterFunc:"in"
+        // Renders a dropdown with search input, checkboxes, Apply/Clear buttons.
+        // valuesLookup pulled from column data automatically.
+        function checklistFilter(
+            cell,
+            onRendered,
+            success,
+            cancel,
+            editorParams,
+        ) {
+            var field = cell.getColumn().getField();
+            var container = document.createElement("div");
+            container.style.position = "relative";
+            container.style.width = "100%";
+
+            // Display input showing selected count
+            var display = document.createElement("input");
+            display.type = "text";
+            display.readOnly = true;
+            display.style.cssText =
+                "width:100%;cursor:pointer;box-sizing:border-box;padding:2px 4px;font-size:12px;";
+            display.placeholder = "Filter...";
+            container.appendChild(display);
+
+            var selected = {};
+            var currentVal = cell.getValue();
+            if (Array.isArray(currentVal)) {
+                currentVal.forEach(function (v) {
+                    selected[v] = true;
+                });
+            }
+
+            function updateDisplay() {
+                var keys = Object.keys(selected);
+                display.value = keys.length ? keys.length + " selected" : "";
+            }
+            updateDisplay();
+
+            // Dropdown panel — appended to body to escape header overflow:hidden
+            var dropdown = document.createElement("div");
+            dropdown.style.cssText =
+                "display:none;position:fixed;z-index:9999;" +
+                "background:var(--clr-surface,#fff);color:var(--clr-text,#333);" +
+                "border:1px solid var(--clr-border,#ccc);box-shadow:0 2px 8px rgba(0,0,0,.25);" +
+                "min-width:180px;max-height:260px;overflow:hidden;font-size:12px;";
+
+            // Search box
+            var searchBox = document.createElement("input");
+            searchBox.type = "text";
+            searchBox.placeholder = "Search...";
+            searchBox.style.cssText =
+                "width:100%;box-sizing:border-box;padding:4px 6px;border:none;" +
+                "border-bottom:1px solid var(--clr-border,#ddd);font-size:12px;" +
+                "background:var(--clr-bg,#fff);color:var(--clr-text,#333);";
+            dropdown.appendChild(searchBox);
+
+            // Checkbox list
+            var listWrap = document.createElement("div");
+            listWrap.style.cssText =
+                "max-height:170px;overflow-y:auto;padding:4px 0;";
+            dropdown.appendChild(listWrap);
+
+            // Button bar
+            var btnBar = document.createElement("div");
+            btnBar.style.cssText =
+                "display:flex;gap:4px;padding:4px 6px;border-top:1px solid var(--clr-border,#ddd);";
+            var applyBtn = document.createElement("button");
+            applyBtn.textContent = "Apply";
+            applyBtn.style.cssText =
+                "flex:1;padding:2px 6px;font-size:11px;cursor:pointer;background:#4472c4;color:#fff;border:1px solid #3560a8;border-radius:3px;";
+            var clearBtn = document.createElement("button");
+            clearBtn.textContent = "Clear";
+            clearBtn.style.cssText =
+                "flex:1;padding:2px 6px;font-size:11px;cursor:pointer;" +
+                "background:var(--clr-bg,#f5f5f5);color:var(--clr-text,#333);" +
+                "border:1px solid var(--clr-border,#ccc);border-radius:3px;";
+            btnBar.appendChild(applyBtn);
+            btnBar.appendChild(clearBtn);
+            dropdown.appendChild(btnBar);
+
+            document.body.appendChild(dropdown);
+
+            function positionDropdown() {
+                var rect = display.getBoundingClientRect();
+                dropdown.style.top = rect.bottom + "px";
+                dropdown.style.left = rect.left + "px";
+                dropdown.style.minWidth = Math.max(180, rect.width) + "px";
+            }
+
+            // Gather unique values from column data
+            function buildList(filterText) {
+                listWrap.innerHTML = "";
+                var table = cell.getTable();
+                var vals = {};
+                table.getData().forEach(function (row) {
+                    var v = row[field];
+                    if (v !== undefined && v !== null && v !== "")
+                        vals[v] = true;
+                });
+                var sorted = Object.keys(vals).sort();
+                var ft = (filterText || "").toLowerCase();
+                sorted.forEach(function (val) {
+                    if (ft && val.toLowerCase().indexOf(ft) === -1) return;
+                    var label = document.createElement("label");
+                    label.style.cssText =
+                        "display:flex;align-items:center;gap:4px;padding:2px 6px;cursor:pointer;white-space:nowrap;";
+                    label.addEventListener("mouseover", function () {
+                        label.style.background = "var(--clr-bg,#e8f0fe)";
+                    });
+                    label.addEventListener("mouseout", function () {
+                        label.style.background = "";
+                    });
+                    var cb = document.createElement("input");
+                    cb.type = "checkbox";
+                    cb.checked = !!selected[val];
+                    cb.style.margin = "0";
+                    cb.addEventListener("change", function () {
+                        if (cb.checked) selected[val] = true;
+                        else delete selected[val];
+                    });
+                    label.appendChild(cb);
+                    label.appendChild(document.createTextNode(val));
+                    listWrap.appendChild(label);
+                });
+            }
+
+            searchBox.addEventListener("input", function () {
+                buildList(searchBox.value);
+            });
+
+            applyBtn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                var keys = Object.keys(selected);
+                updateDisplay();
+                dropdown.style.display = "none";
+                success(keys.length ? keys : "");
+            });
+
+            clearBtn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                selected = {};
+                buildList(searchBox.value);
+                updateDisplay();
+                dropdown.style.display = "none";
+                success("");
+            });
+
+            display.addEventListener("click", function (e) {
+                e.stopPropagation();
+                var showing = dropdown.style.display !== "none";
+                if (showing) {
+                    dropdown.style.display = "none";
+                } else {
+                    positionDropdown();
+                    dropdown.style.display = "block";
+                    searchBox.value = "";
+                    buildList("");
+                    searchBox.focus();
+                }
+            });
+
+            // Close dropdown on outside click
+            function onDocClick(e) {
+                if (
+                    !container.contains(e.target) &&
+                    !dropdown.contains(e.target)
+                ) {
+                    dropdown.style.display = "none";
+                }
+            }
+            document.addEventListener("click", onDocClick);
+            onCleanup(function () {
+                document.removeEventListener("click", onDocClick);
+                if (dropdown.parentNode)
+                    dropdown.parentNode.removeChild(dropdown);
+            });
+
+            return container;
+        }
 
         function parseJSON(sig) {
             try {
@@ -99,20 +285,12 @@
             var rows = parseJSON($$data);
             var sort = parseJSON($$initialSort);
 
-            // Prepend checkbox select column if selectable-rows is on
-            if (!!$$selectableRows) {
-                cols.unshift({
-                    formatter: "rowSelection",
-                    titleFormatter: "rowSelection",
-                    headerSort: false,
-                    resizable: false,
-                    frozen: true,
-                    width: 40,
-                    hozAlign: "center",
-                    headerHozAlign: "center",
-                    cssClass: "tabulator-row-select-col",
-                });
-            }
+            // Replace "checklistFilter" string with actual function
+            cols.forEach(function (c) {
+                if (c.headerFilter === "checklistFilter") {
+                    c.headerFilter = checklistFilter;
+                }
+            });
 
             var config = {
                 data: rows,
@@ -124,19 +302,35 @@
                 columns: cols,
             };
 
-            if (!!$$selectableRows) {
-                config.selectableRows = true;
+            if ($$rowIndex) {
+                config.index = "" + $$rowIndex;
             }
 
             if (sort.length) {
                 config.initialSort = sort;
             }
 
+            if (!!$$selectableRows) {
+                config.selectableRows = "highlight";
+                config.rowHeader = {
+                    formatter: "rowSelection",
+                    titleFormatter: "rowSelection",
+                    headerSort: false,
+                    resizable: false,
+                    frozen: true,
+                    headerHozAlign: "center",
+                    hozAlign: "center",
+                    width: 40,
+                };
+            }
+
             if (!!$$enableRowClick) {
                 config.rowFormatter = function (row) {
                     var rowEl = row.getElement();
                     rowEl.style.cursor = "pointer";
-                    rowEl.addEventListener("click", function () {
+                    rowEl.addEventListener("click", function (e) {
+                        // Don't open detail when clicking the selection checkbox
+                        if (e.target.closest(".tabulator-row-header")) return;
                         el.dispatchEvent(
                             new CustomEvent("tab-row-click", {
                                 detail: { row: row.getData() },
@@ -149,6 +343,7 @@
             }
 
             tabInstance = new Tabulator($$tableEl, config);
+            el._tabInstance = tabInstance;
 
             // seed prevDataStr so the data-watch effect only fires on real changes
             prevDataStr = "" + ($$data || "");
@@ -162,10 +357,9 @@
 
             if (!!$$selectableRows) {
                 function emitSelection() {
-                    var selected = tabInstance.getSelectedData();
                     el.dispatchEvent(
                         new CustomEvent("tab-rows-selected", {
-                            detail: { rows: selected },
+                            detail: { rows: tabInstance.getSelectedData() },
                             bubbles: true,
                             composed: true,
                         }),
@@ -192,9 +386,136 @@
             }
         });
 
+        // ── Column picker with drag-to-reorder (visibility + order) ──
+        // Call from outside: document.getElementById('myGrid')._showColPicker(anchorBtn)
+        var _colPickerPanel = null;
+        var _colPickerCleanup = null;
+
+        el._showColPicker = function (anchorEl) {
+            if (!tabInstance) return;
+
+            // Toggle off if already open
+            if (_colPickerPanel) {
+                _colPickerPanel.remove();
+                _colPickerPanel = null;
+                if (_colPickerCleanup) _colPickerCleanup();
+                _colPickerCleanup = null;
+                return;
+            }
+
+            var table = tabInstance;
+            var allCols = table.getColumns().filter(function (c) { return !!c.getField(); });
+            var colCount = allCols.length;
+
+            // Auto-column layout: 30 fields per picker column (1 col ≤30, 2 cols ≤60, etc.)
+            var numCols = Math.max(1, Math.ceil(colCount / 30));
+
+            var panel = document.createElement("div");
+            _colPickerPanel = panel;
+            panel.style.cssText = "position:fixed;z-index:1000;" +
+                "background:var(--clr-surface,#fff);color:var(--clr-text,#333);" +
+                "border:1px solid var(--clr-border,#ccc);" +
+                "border-radius:4px;padding:6px 4px;max-height:750px;overflow-y:auto;" +
+                "box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:12px;" +
+                "column-count:" + numCols + ";column-gap:8px;min-width:" + (numCols * 180) + "px;";
+
+            var dragSrc = null;
+
+            allCols.forEach(function (col) {
+                var def = col.getDefinition();
+                var row = document.createElement("div");
+                row.draggable = true;
+                row.dataset.field = def.field;
+                row.style.cssText = "display:flex;align-items:center;gap:4px;padding:2px 4px;" +
+                    "cursor:pointer;border-radius:3px;white-space:nowrap;break-inside:avoid;";
+
+                // Drag handle
+                var grip = document.createElement("span");
+                grip.textContent = "\u2807";
+                grip.style.cssText = "cursor:grab;opacity:.5;font-size:14px;user-select:none;color:var(--clr-text,#666);";
+                row.appendChild(grip);
+
+                var cb = document.createElement("input");
+                cb.type = "checkbox";
+                cb.checked = col.isVisible();
+                cb.style.cssText = "margin:0;cursor:pointer;";
+                cb.addEventListener("change", function (e) {
+                    e.stopPropagation();
+                    col.toggle();
+                    emitColumnState();
+                });
+                row.appendChild(cb);
+                row.appendChild(document.createTextNode(" " + (def.title || def.field)));
+
+                row.addEventListener("mouseover", function () { row.style.background = "var(--clr-bg,#f0f4ff)"; });
+                row.addEventListener("mouseout", function () { row.style.background = ""; });
+
+                // Drag events
+                row.addEventListener("dragstart", function (e) {
+                    dragSrc = row;
+                    row.style.opacity = ".4";
+                    e.dataTransfer.effectAllowed = "move";
+                });
+                row.addEventListener("dragend", function () {
+                    dragSrc = null;
+                    row.style.opacity = "";
+                    panel.querySelectorAll("div").forEach(function (d) {
+                        d.style.borderTop = "";
+                    });
+                });
+                row.addEventListener("dragover", function (e) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragSrc && row !== dragSrc) row.style.borderTop = "2px solid #4472c4";
+                });
+                row.addEventListener("dragleave", function () {
+                    row.style.borderTop = "";
+                });
+                row.addEventListener("drop", function (e) {
+                    e.preventDefault();
+                    row.style.borderTop = "";
+                    if (!dragSrc || dragSrc === row) return;
+                    panel.insertBefore(dragSrc, row);
+                    table.moveColumn(dragSrc.dataset.field, row.dataset.field, true);
+                    emitColumnState();
+                });
+
+                panel.appendChild(row);
+            });
+
+            // Position below anchor, clamped to viewport
+            var rect = anchorEl ? anchorEl.getBoundingClientRect()
+                                : el.getBoundingClientRect();
+            document.body.appendChild(panel);
+            var panelRect = panel.getBoundingClientRect();
+            var top = rect.bottom + 4;
+            var maxTop = window.innerHeight - panelRect.height - 4;
+            if (top > maxTop) top = Math.max(4, maxTop);
+            panel.style.top = top + "px";
+            panel.style.left = rect.left + "px";
+
+            // Close on outside click
+            function onDown(e) {
+                if (!panel.contains(e.target) && e.target !== anchorEl) {
+                    panel.remove();
+                    _colPickerPanel = null;
+                    document.removeEventListener("mousedown", onDown);
+                    _colPickerCleanup = null;
+                }
+            }
+            setTimeout(function () {
+                document.addEventListener("mousedown", onDown);
+            }, 50);
+            _colPickerCleanup = function () {
+                document.removeEventListener("mousedown", onDown);
+            };
+        };
+
         // ── Cleanup ───────────────────────────────────────────────
         onCleanup(function () {
             clearTimeout(_colTimer);
+            if (_colPickerPanel) { _colPickerPanel.remove(); _colPickerPanel = null; }
+            if (_colPickerCleanup) { _colPickerCleanup(); _colPickerCleanup = null; }
             if (tabInstance) {
                 tabInstance.destroy();
                 tabInstance = null;
