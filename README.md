@@ -1,6 +1,6 @@
-# 🚀Rocket Tom Select RC.8  
+# 🚀Rocket Tom Select with datastar 1.0.0  
 
-A Datastar **Rocket** version RC.8 web component wrapping [Tom Select](https://tom-select.js.org/).
+A Datastar **Rocket** version 1 web component wrapping [Tom Select](https://tom-select.js.org/).
 Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) License.
 
 
