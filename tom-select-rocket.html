@@ -1,222 +1,145 @@
+<!DOCTYPE html>
 <!--
-  Rocket Tom Select Component
-  ============================
-  A Datastar Rocket web component wrapping Tom Select.
+  Rocket Tom Select — standalone demo page
+  ========================================
+  Datastar Pro v1.0.1 JS-API component (static/components/tom-select-rocket.js).
+  The component self-loads Tom Select from CDN, so no Tom Select <script> here
+  (only its CSS). Public element contract is unchanged from the RC.7 template
+  version: <rocket-tom-select> props placeholder / max-items / options / value
+  / allow-create / detail-field / search-url / check-options; emits ts-change.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rocket + Tom Select — Datastar Pro v1.0.1</title>
 
-  Usage:
+  <!-- Tom Select CSS (the component loads the Tom Select JS itself) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/css/tom-select.css" />
+
+  <!-- Datastar Pro v1.0.1 + Inspector + the Rocket component module -->
+  <script type="module" src="/static/datastar-pro.js"></script>
+  <script type="module" src="/static/datastar-inspector.js"></script>
+  <script type="module" src="/static/components/tom-select-rocket.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #1a1a2e;
+      background: #f8f9fa;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #666; margin-bottom: 2rem; }
+    .nav { font-size: .85rem; margin-bottom: 1.5rem; }
+    .nav a { color: #4472c4; }
+    .card {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card h2 { margin-top: 0; font-size: 1.1rem; }
+    .card p { color: #555; font-size: 0.9rem; }
+    .output {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #f0f4f8;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+    rocket-tom-select { display: block; margin: 1rem 0; }
+    .ts-wrapper .ts-control,
+    .ts-wrapper .ts-control input,
+    .ts-wrapper .ts-dropdown .option { color: #1a1a2e; }
+  </style>
+</head>
+<body>
+  <h1>Rocket + Tom Select</h1>
+  <p class="subtitle">Datastar Rocket web component wrapping Tom Select (Pro v1.0.1 JS-API)</p>
+  <p class="nav"><a href="/">← Index</a> &nbsp;·&nbsp; <a href="/tabulator">Tabulator demo →</a></p>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 1: Single Select with Static Options          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:selectedFruit="''">
+    <h2>Single Select — Three-Column Dropdown</h2>
+    <p>Pick one fruit. Dropdown shows origin and season. Selected pill shows all three.</p>
+
     <rocket-tom-select
       placeholder="Pick a fruit..."
-      max-items="3"
-      options='[{"value":"a","text":"Apple"}]'
+      options='[{"value":"apple","text":"Apple","origin":"Central Asia","season":"Fall"},{"value":"banana","text":"Banana","origin":"Southeast Asia","season":"Year-round"},{"value":"cherry","text":"Cherry","origin":"Europe","season":"Summer"},{"value":"dragonfruit","text":"Dragon Fruit","origin":"Central America","season":"Summer"},{"value":"elderberry","text":"Elderberry","origin":"Europe","season":"Late Summer"},{"value":"fig","text":"Fig","origin":"Mediterranean","season":"Late Summer"},{"value":"grape","text":"Grape","origin":"Near East","season":"Fall"},{"value":"honeydew","text":"Honeydew","origin":"West Africa","season":"Summer"},{"value":"kiwi","text":"Kiwi","origin":"China","season":"Winter"},{"value":"lemon","text":"Lemon","origin":"South Asia","season":"Year-round"},{"value":"mango","text":"Mango","origin":"South Asia","season":"Summer"},{"value":"nectarine","text":"Nectarine","origin":"China","season":"Summer"},{"value":"orange","text":"Orange","origin":"Southeast Asia","season":"Winter"},{"value":"papaya","text":"Papaya","origin":"Central America","season":"Year-round"},{"value":"quince","text":"Quince","origin":"Caucasus","season":"Fall"}]'
+      detail-field="origin,season"
       data-on:ts-change="$selectedFruit = evt.detail.value"
     ></rocket-tom-select>
 
-  Props (data-props codec syntax):
-    placeholder   - Placeholder text (string, default: "Select...")
-    max-items     - Max selectable items (int, min 1, default: 1)
-    options       - JSON string of [{value, text}] objects (string)
-    value         - Current value, comma-separated for multi (string)
-    allow-create  - Allow user to create new items (boolean, default: false)
-    detail-field  - Comma-separated extra field names for multi-column dropdown (string)
-    search-url    - Backend URL for remote search (string)
-    check-options - Enable checkbox multi-select with Apply/Clear buttons (boolean, default: false)
+    <div class="output">
+      Selected: <span data-text="$selectedFruit || '(none)'"></span>
+    </div>
+  </div>
 
-  Emits:
-    ts-change CustomEvent with detail.value (string)
-    Listen via: data-on:ts-change="$mySignal = evt.detail.value"
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 2: Multi-Select with Tags                     -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:selectedFruits="''">
+    <h2>Multi-Select — Tagging</h2>
+    <p>Pick up to 5 fruits. Includes remove buttons on tags. Hold shift to select multiples from list.</p>
 
-  Note: options uses string codec (not json) to avoid Datastar signal proxy
-  issues with arrays. The JSON is parsed inside the component script.
--->
+    <rocket-tom-select
+      placeholder="Choose fruits..."
+      max-items="5"
+      options='[{"value":"apple","text":"Apple","origin":"Central Asia","season":"Fall"},{"value":"banana","text":"Banana","origin":"Southeast Asia","season":"Year-round"},{"value":"cherry","text":"Cherry","origin":"Europe","season":"Summer"},{"value":"dragonfruit","text":"Dragon Fruit","origin":"Central America","season":"Summer"},{"value":"elderberry","text":"Elderberry","origin":"Europe","season":"Late Summer"},{"value":"fig","text":"Fig","origin":"Mediterranean","season":"Late Summer"},{"value":"grape","text":"Grape","origin":"Near East","season":"Fall"},{"value":"honeydew","text":"Honeydew","origin":"West Africa","season":"Summer"},{"value":"kiwi","text":"Kiwi","origin":"China","season":"Winter"},{"value":"lemon","text":"Lemon","origin":"South Asia","season":"Year-round"},{"value":"mango","text":"Mango","origin":"South Asia","season":"Summer"},{"value":"nectarine","text":"Nectarine","origin":"China","season":"Summer"},{"value":"orange","text":"Orange","origin":"Southeast Asia","season":"Winter"},{"value":"papaya","text":"Papaya","origin":"Central America","season":"Year-round"},{"value":"quince","text":"Quince","origin":"Caucasus","season":"Fall"}]'
+      data-on:ts-change="$selectedFruits = evt.detail.value"
+    ></rocket-tom-select>
 
-<template data-rocket:rocket-tom-select
-  data-props:placeholder="string|=Select..."
-  data-props:max-items="int|min:1|=1"
-  data-props:options="string|="
-  data-props:value="string|="
-  data-props:allow-create="boolean|=false"
-  data-props:detail-field="string|="
-  data-props:search-url="string|="
-  data-props:check-options="boolean|=false"
-  data-import:TomSelect__iife="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/js/tom-select.complete.min.js"
->
-  <script>
-    let tsInstance = null
+    <div class="output">
+      Selected: <span data-text="$selectedFruits || '(none)'"></span>
+    </div>
+  </div>
 
-    function parseOptions() {
-      try {
-        const raw = '' + ($$options || '')
-        return raw ? JSON.parse(raw) : []
-      } catch(e) {
-        return []
-      }
-    }
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 3: Remote Search                              -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:selectedUser="''">
+    <h2>Remote Search — Users</h2>
+    <p>Type to search users from the backend. Try "alice" or "grace".</p>
 
-    function buildConfig() {
-      const opts = parseOptions()
-      const config = {
-        placeholder: '' + ($$placeholder || ''),
-        maxItems: +($$maxItems || 1),
-        maxOptions: null,
-        create: !!($$allowCreate),
-        plugins: {},
-        onInitialize: function () {
-          var v = '' + ($$value || '')
-          if (v) {
-            this.setValue(v.split(','), true)
-          }
-        },
-        onChange: function (val) {
-          try {
-            var strVal = Array.isArray(val) ? val.join(',') : ('' + (val || ''))
-            $$value = strVal
-            el.dispatchEvent(new CustomEvent('ts-change', {
-              detail: { value: strVal },
-              bubbles: true,
-              composed: true
-            }))
-          } catch(e) {
-            console.error('[TomSelect onChange]', e)
-          }
-        }
-      }
+    <rocket-tom-select
+      placeholder="Search users..."
+      search-url="/api/search/users"
+      data-on:ts-change="$selectedUser = evt.detail.value"
+    ></rocket-tom-select>
 
-      if (!!($$checkOptions)) {
-        config.maxItems = 50
-        config.plugins.checkbox_options = {}
-        config.plugins.remove_button = { title: 'Remove' }
-        // Suppress onChange — Apply button will fire it
-        config._realOnChange = config.onChange
-        config.onChange = function () {}
-      } else if (+($$maxItems || 1) > 1) {
-        config.plugins.remove_button = { title: 'Remove' }
-      }
+    <div class="output">
+      Selected: <span data-text="$selectedUser || '(none)'"></span>
+    </div>
+  </div>
 
-      if (opts.length > 0) {
-        config.options = opts
-        config.labelField = 'text'
-        config.valueField = 'value'
-        config.searchField = ['text']
-      }
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 4: Create + Multi with Backend POST           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:tags="''">
+    <h2>Creatable Tags — with Backend Sync</h2>
+    <p>Type to create new tags. Selection is sent to the backend via SSE.</p>
 
-      var df = '' + ($$detailField || '')
-      if (df) {
-        var fields = df.split(',').map(function(f){ return f.trim() })
-        config.searchField = ['text'].concat(fields)
-        config.render = {
-          option: function(data, escape) {
-            var html = '<div style="display:flex;gap:.5rem">'
-              + '<span style="flex:1">' + escape(data.text) + '</span>'
-            for (var i = 0; i < fields.length; i++) {
-              html += '<span style="color:#888;font-size:.8em;min-width:5rem;text-align:right">' + escape(data[fields[i]] || '') + '</span>'
-            }
-            return html + '</div>'
-          },
-          item: function(data, escape) {
-            var parts = [escape(data.text)]
-            for (var i = 0; i < fields.length; i++) {
-              if (data[fields[i]]) parts.push(escape(data[fields[i]]))
-            }
-            return '<div>' + parts.join(' · ') + '</div>'
-          }
-        }
-      }
+    <rocket-tom-select
+      placeholder="Add tags..."
+      max-items="10"
+      allow-create="true"
+      options='[{"value":"javascript","text":"JavaScript"},{"value":"typescript","text":"TypeScript"},{"value":"node","text":"Node.js"},{"value":"datastar","text":"Datastar"},{"value":"fastify","text":"Fastify"}]'
+      data-on:ts-change="$tags = evt.detail.value; @post('/api/save-tags')"
+    ></rocket-tom-select>
 
-      var sUrl = '' + ($$searchUrl || '')
-      if (sUrl) {
-        config.load = function (query, callback) {
-          if (!query.length) return callback()
-          fetch(sUrl + '?q=' + encodeURIComponent(query))
-            .then(function(res) { return res.json() })
-            .then(function(data) { callback(data) })
-            .catch(function() { callback() })
-        }
-        config.labelField = 'text'
-        config.valueField = 'value'
-        config.searchField = ['text']
-      }
+    <div id="tag-result" class="output">
+      Tags: <span data-text="$tags || '(none)'"></span>
+    </div>
+  </div>
 
-      return config
-    }
-
-    effect(function() {
-      if (!$$selectEl || !TomSelect) return
-      if (tsInstance) return
-      var cfg = buildConfig()
-      tsInstance = new TomSelect($$selectEl, cfg)
-      // Append Apply / Clear buttons for checkbox mode
-      if (cfg._realOnChange) {
-        var fireChange = cfg._realOnChange
-        var bar = document.createElement('div')
-        bar.style.cssText = 'display:flex;gap:4px;padding:4px 6px;border-top:1px solid var(--clr-border,#ddd);'
-        var applyBtn = document.createElement('button')
-        applyBtn.type = 'button'
-        applyBtn.textContent = 'Apply'
-        applyBtn.style.cssText = 'flex:1;padding:2px 6px;font-size:11px;cursor:pointer;background:#4472c4;color:#fff;border:1px solid #3560a8;border-radius:3px;'
-        var clearBtn = document.createElement('button')
-        clearBtn.type = 'button'
-        clearBtn.textContent = 'Clear'
-        clearBtn.style.cssText = 'flex:1;padding:2px 6px;font-size:11px;cursor:pointer;background:var(--clr-bg,#f5f5f5);color:var(--clr-text,#333);border:1px solid var(--clr-border,#ccc);border-radius:3px;'
-        var ts = tsInstance
-        applyBtn.addEventListener('click', function (e) {
-          e.stopPropagation()
-          fireChange.call(ts, ts.getValue())
-          ts.close()
-        })
-        clearBtn.addEventListener('click', function (e) {
-          e.stopPropagation()
-          ts.clear(true)
-          fireChange.call(ts, '')
-          ts.close()
-        })
-        bar.appendChild(applyBtn)
-        bar.appendChild(clearBtn)
-        tsInstance.dropdown.style.display = 'flex'
-        tsInstance.dropdown.style.flexDirection = 'column'
-        tsInstance.dropdown_content.style.maxHeight = '170px'
-        tsInstance.dropdown_content.style.flex = '1'
-        tsInstance.dropdown.appendChild(bar)
-        tsInstance.close()
-        tsInstance.blur()
-      }
-    })
-
-    var prevOptionsStr = ''
-    effect(function() {
-      if (!tsInstance) return
-      var optStr = '' + ($$options || '')
-      if (optStr !== prevOptionsStr) {
-        prevOptionsStr = optStr
-        try {
-          var parsed = optStr ? JSON.parse(optStr) : []
-          tsInstance.clearOptions()
-          tsInstance.addOptions(parsed)
-          tsInstance.refreshOptions(false)
-        } catch(e) {}
-      }
-    })
-
-    var lastSyncedValue = ''
-    effect(function() {
-      if (!tsInstance) return
-      var newVal = '' + ($$value || '')
-      if (newVal !== lastSyncedValue) {
-        lastSyncedValue = newVal
-        if (newVal) {
-          tsInstance.setValue(newVal.split(','), true)
-        } else {
-          tsInstance.clear(true)
-        }
-      }
-    })
-
-    onCleanup(function() {
-      if (tsInstance) {
-        tsInstance.destroy()
-        tsInstance = null
-      }
-    })
-  </script>
-
-  <select data-ref="selectEl"></select>
-</template>
+  <datastar-inspector></datastar-inspector>
+</body>
+</html>
