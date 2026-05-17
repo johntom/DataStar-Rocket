@@ -1,527 +1,194 @@
+<!DOCTYPE html>
 <!--
-  Rocket Tabulator Component
-  ============================
-  A Datastar Rocket web component wrapping Tabulator 6.3.
+  Rocket Tabulator — standalone demo page
+  =======================================
+  Datastar Pro v1.0.1 JS-API component (static/components/tabulator-rocket.js).
+  Unlike the old RC.7 <template data-rocket:> (which used data-import: to fetch
+  Tabulator), the v1.0.1 module expects window.Tabulator to be preloaded — so
+  this page includes the Tabulator JS <script> below. Public element contract
+  is unchanged: <rocket-tabulator> props columns / data / height / layout /
+  movable-columns / resizable-columns / enable-row-click / selectable-rows /
+  initial-sort / initial-filters; emits tab-row-click, tab-rows-selected,
+  tab-columns-changed.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rocket + Tabulator — Datastar Pro v1.0.1</title>
 
-  Usage:
+  <!-- Tabulator CSS + JS (v1.0.1 component needs window.Tabulator preloaded) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/css/tabulator_modern.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
+
+  <!-- Datastar Pro v1.0.1 + Inspector + the Rocket component module -->
+  <script type="module" src="/static/datastar-pro.js"></script>
+  <script type="module" src="/static/datastar-inspector.js"></script>
+  <script type="module" src="/static/components/tabulator-rocket.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #1a1a2e;
+      background: #f8f9fa;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    .subtitle { color: #666; margin-bottom: 2rem; }
+    .nav { font-size: .85rem; margin-bottom: 1.5rem; }
+    .nav a { color: #4472c4; }
+    .card {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card h2 { margin-top: 0; font-size: 1.1rem; }
+    .card p { color: #555; font-size: 0.9rem; }
+    .output {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #f0f4f8;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+    rocket-tabulator { display: block; margin: 1rem 0; }
+    button { padding: .3rem .8rem; margin-right: .4rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Rocket + Tabulator</h1>
+  <p class="subtitle">Datastar Rocket web component wrapping Tabulator 6.3 (Pro v1.0.1 JS-API)</p>
+  <p class="nav"><a href="/">← Index</a> &nbsp;·&nbsp; <a href="/tom-select">Tom Select demo →</a></p>
+
+  <!-- Sample data, defined once; subsets derived for the dynamic-swap example -->
+  <script>
+    var EMP = [
+      { id: 1,  name: "Alice Johnson",  department: "Engineering", salary: 95000,  startDate: "2020-03-15", active: true  },
+      { id: 2,  name: "Bob Smith",      department: "Marketing",   salary: 72000,  startDate: "2019-07-22", active: true  },
+      { id: 3,  name: "Charlie Brown",  department: "Engineering", salary: 105000, startDate: "2018-01-10", active: true  },
+      { id: 4,  name: "Diana Prince",   department: "HR",          salary: 68000,  startDate: "2021-11-01", active: false },
+      { id: 5,  name: "Eve Torres",     department: "Engineering", salary: 112000, startDate: "2017-06-30", active: true  },
+      { id: 6,  name: "Frank Castle",   department: "Sales",       salary: 78000,  startDate: "2022-02-14", active: true  },
+      { id: 7,  name: "Grace Hopper",   department: "Engineering", salary: 125000, startDate: "2016-09-05", active: true  },
+      { id: 8,  name: "Hank Pym",       department: "R&D",         salary: 98000,  startDate: "2020-08-20", active: false },
+      { id: 9,  name: "Ivy Chen",       department: "Marketing",   salary: 65000,  startDate: "2023-01-09", active: true  },
+      { id: 10, name: "Jack Ryan",      department: "Sales",       salary: 82000,  startDate: "2019-04-18", active: true  }
+    ];
+    var EMP_JSON = JSON.stringify(EMP);
+    var _empAll = EMP_JSON;
+    var _empActive = JSON.stringify(EMP.filter(function (e) { return e.active; }));
+    var _empInactive = JSON.stringify(EMP.filter(function (e) { return !e.active; }));
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 5: Basic Tabulator Grid                        -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card">
+    <h2>Basic Grid — Employees</h2>
+    <p>Sortable columns, header filters, money formatter. Drag columns to reorder. With Columns picker.</p>
+
+    <div style="margin-bottom:0.75rem">
+      <button data-on:click="document.getElementById('grid-emp')._showColPicker(el)">Columns</button>
+    </div>
+
     <rocket-tabulator
-      columns='[{"title":"Name","field":"name","headerFilter":true}]'
-      data='[{"name":"Alice"}]'
+      id="grid-emp"
+      columns='[{"title":"ID","field":"id","width":60,"headerFilter":true},{"title":"Name","field":"name","headerFilter":true},{"title":"Department","field":"department","headerFilter":"list","headerFilterParams":{"valuesLookup":true,"clearable":true,"sort":"asc","placeholderEmpty":"All","placeholderLoaded":"All"}},{"title":"Salary","field":"salary","hozAlign":"right","formatter":"money","formatterParams":{"thousand":",","symbol":"$"}},{"title":"Start Date","field":"startDate","width":110},{"title":"Active","field":"active","formatter":"tickCross","width":80}]'
+      data='[{"id":1,"name":"Alice Johnson","department":"Engineering","salary":95000,"startDate":"2020-03-15","active":true},{"id":2,"name":"Bob Smith","department":"Marketing","salary":72000,"startDate":"2019-07-22","active":true},{"id":3,"name":"Charlie Brown","department":"Engineering","salary":105000,"startDate":"2018-01-10","active":true},{"id":4,"name":"Diana Prince","department":"HR","salary":68000,"startDate":"2021-11-01","active":false},{"id":5,"name":"Eve Torres","department":"Engineering","salary":112000,"startDate":"2017-06-30","active":true},{"id":6,"name":"Frank Castle","department":"Sales","salary":78000,"startDate":"2022-02-14","active":true},{"id":7,"name":"Grace Hopper","department":"Engineering","salary":125000,"startDate":"2016-09-05","active":true},{"id":8,"name":"Hank Pym","department":"R&D","salary":98000,"startDate":"2020-08-20","active":false},{"id":9,"name":"Ivy Chen","department":"Marketing","salary":65000,"startDate":"2023-01-09","active":true},{"id":10,"name":"Jack Ryan","department":"Sales","salary":82000,"startDate":"2019-04-18","active":true}]'
       height="320px"
       layout="fitColumns"
       movable-columns="true"
+      initial-sort='[{"column":"name","dir":"asc"}]'
+    ></rocket-tabulator>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 6: Row Click                                   -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:clickedEmployee="''">
+    <h2>Row Click — Employee Detail</h2>
+    <p>Click any row to see its data below.</p>
+
+    <rocket-tabulator
+      columns='[{"title":"ID","field":"id","width":60},{"title":"Name","field":"name"},{"title":"Department","field":"department"},{"title":"Salary","field":"salary","hozAlign":"right","formatter":"money","formatterParams":{"thousand":",","symbol":"$"}}]'
+      data='[{"id":1,"name":"Alice Johnson","department":"Engineering","salary":95000,"startDate":"2020-03-15","active":true},{"id":2,"name":"Bob Smith","department":"Marketing","salary":72000,"startDate":"2019-07-22","active":true},{"id":3,"name":"Charlie Brown","department":"Engineering","salary":105000,"startDate":"2018-01-10","active":true},{"id":4,"name":"Diana Prince","department":"HR","salary":68000,"startDate":"2021-11-01","active":false},{"id":5,"name":"Eve Torres","department":"Engineering","salary":112000,"startDate":"2017-06-30","active":true},{"id":6,"name":"Frank Castle","department":"Sales","salary":78000,"startDate":"2022-02-14","active":true},{"id":7,"name":"Grace Hopper","department":"Engineering","salary":125000,"startDate":"2016-09-05","active":true},{"id":8,"name":"Hank Pym","department":"R&D","salary":98000,"startDate":"2020-08-20","active":false},{"id":9,"name":"Ivy Chen","department":"Marketing","salary":65000,"startDate":"2023-01-09","active":true},{"id":10,"name":"Jack Ryan","department":"Sales","salary":82000,"startDate":"2019-04-18","active":true}]'
+      height="280px"
       enable-row-click="true"
-      data-on:tab-row-click="$clicked = JSON.stringify(evt.detail.row)"
+      data-on:tab-row-click="$clickedEmployee = JSON.stringify(evt.detail.row)"
     ></rocket-tabulator>
 
-  Props (data-props codec syntax):
-    columns            - JSON string of Tabulator column definitions (string)
-    data               - JSON string of row data array (string)
-    height             - CSS height for the grid (string, default: "311px")
-    layout             - Tabulator layout mode (string, default: "fitColumns")
-    placeholder        - Empty-table message (string, default: "No Data")
-    movable-columns    - Allow column drag reorder (boolean, default: false)
-    resizable-columns  - Allow column resize (boolean, default: true)
-    enable-row-click   - Attach row click handlers (boolean, default: false)
-    selectable-rows    - Show row selection checkboxes (boolean, default: false)
-    initial-sort       - JSON string of [{column, dir}] sort config (string)
+    <div class="output">
+      Clicked: <span data-text="$clickedEmployee || '(click a row)'"></span>
+    </div>
+  </div>
 
-  Emits:
-    tab-row-click         - CustomEvent with detail.row (object) on row click
-    tab-columns-changed   - CustomEvent with detail.columns ([{field, visible, width}])
-                            debounced 600ms on column move/resize/visibility change
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 7: Selectable Rows + Row Click Dialog          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" style="position:relative" data-signals:selectedCount="0" data-signals:selectedIds="''" data-signals:dlgName="''" data-signals:dlgDept="''" data-signals:dlgSalary="''" data-signals:dlgOpen="false">
+    <h2>Checkbox Select + Row Click Dialog</h2>
+    <p>Use checkboxes to select rows. Click a row to open a detail dialog.</p>
 
-  Methods (on the element):
-    _showColPicker(anchorEl)  - Toggle column picker popup (visibility + drag reorder)
-                                Auto-columns: 1 col <20 fields, 2 cols 20-39, 3 cols 40+
-    _tabInstance              - Direct access to the Tabulator instance
+    <rocket-tabulator
+      columns='[{"title":"ID","field":"id","width":60},{"title":"Name","field":"name"},{"title":"Department","field":"department"},{"title":"Salary","field":"salary","hozAlign":"right","formatter":"money","formatterParams":{"thousand":",","symbol":"$"}},{"title":"Start Date","field":"startDate","width":110}]'
+      data='[{"id":1,"name":"Alice Johnson","department":"Engineering","salary":95000,"startDate":"2020-03-15","active":true},{"id":2,"name":"Bob Smith","department":"Marketing","salary":72000,"startDate":"2019-07-22","active":true},{"id":3,"name":"Charlie Brown","department":"Engineering","salary":105000,"startDate":"2018-01-10","active":true},{"id":4,"name":"Diana Prince","department":"HR","salary":68000,"startDate":"2021-11-01","active":false},{"id":5,"name":"Eve Torres","department":"Engineering","salary":112000,"startDate":"2017-06-30","active":true},{"id":6,"name":"Frank Castle","department":"Sales","salary":78000,"startDate":"2022-02-14","active":true},{"id":7,"name":"Grace Hopper","department":"Engineering","salary":125000,"startDate":"2016-09-05","active":true},{"id":8,"name":"Hank Pym","department":"R&D","salary":98000,"startDate":"2020-08-20","active":false},{"id":9,"name":"Ivy Chen","department":"Marketing","salary":65000,"startDate":"2023-01-09","active":true},{"id":10,"name":"Jack Ryan","department":"Sales","salary":82000,"startDate":"2019-04-18","active":true}]'
+      height="320px"
+      selectable-rows="true"
+      enable-row-click="true"
+      data-on:tab-rows-selected="$selectedCount = evt.detail.rows.length; $selectedIds = evt.detail.rows.map(function(r){return r.id}).join(', ')"
+      data-on:tab-row-click="$dlgName = evt.detail.row.name; $dlgDept = evt.detail.row.department; $dlgSalary = '$' + Number(evt.detail.row.salary).toLocaleString(); $dlgOpen = true"
+    ></rocket-tabulator>
 
-  Note: columns and data use string codec (not json) to avoid Datastar signal
-  proxy issues with arrays. JSON is parsed inside the component script.
--->
+    <div class="output">
+      Selected rows: <strong data-text="$selectedCount"></strong>
+      &nbsp;— IDs: <span data-text="$selectedIds || '(none)'"></span>
+    </div>
 
-<template
-    data-rocket:rocket-tabulator
-    data-props:columns="string|="
-    data-props:data="string|="
-    data-props:height="string|=311px"
-    data-props:layout="string|=fitColumns"
-    data-props:placeholder="string|=No Data"
-    data-props:movable-columns="boolean|=false"
-    data-props:resizable-columns="boolean|=true"
-    data-props:enable-row-click="boolean|=false"
-    data-props:selectable-rows="boolean|=false"
-    data-props:initial-sort="string|="
-    data-props:row-index="string|="
-    data-import:Tabulator__iife="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"
->
-    <script>
-        var tabInstance = null;
-        var tabReady = null; // promise resolved on tableBuilt
-        var _colTimer = null;
+    <!-- Dialog — centered over the grid via position:relative on .card -->
+    <div data-show="$dlgOpen" style="position:absolute;inset:0;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;z-index:10;border-radius:8px">
+      <div style="background:#fff;border-radius:6px;padding:.75rem 1rem;width:220px;box-shadow:0 4px 16px rgba(0,0,0,.18);font-size:.82rem">
+        <h3 style="margin:0 0 .5rem;font-size:.9rem">Employee Detail</h3>
+        <p style="margin:.2rem 0"><strong>Name:</strong> <span data-text="$dlgName"></span></p>
+        <p style="margin:.2rem 0"><strong>Dept:</strong> <span data-text="$dlgDept"></span></p>
+        <p style="margin:.2rem 0"><strong>Salary:</strong> <span data-text="$dlgSalary"></span></p>
+        <button style="margin-top:.5rem;padding:.25rem .8rem;border:1px solid #ccc;border-radius:3px;cursor:pointer;background:#f0f0f0;font-size:.78rem"
+                data-on:click="$dlgOpen = false">Close</button>
+      </div>
+    </div>
+  </div>
 
-        // ── Custom "checklistFilter" header filter editor ────────
-        // Usage: headerFilter:"checklistFilter", headerFilterFunc:"in"
-        // Renders a dropdown with search input, checkboxes, Apply/Clear buttons.
-        // valuesLookup pulled from column data automatically.
-        function checklistFilter(
-            cell,
-            onRendered,
-            success,
-            cancel,
-            editorParams,
-        ) {
-            var field = cell.getColumn().getField();
-            var container = document.createElement("div");
-            container.style.position = "relative";
-            container.style.width = "100%";
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- Example 8: Dynamic Data Swap                           -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div class="card" data-signals:filterMode="'all'" data-signals:empData="''" data-on:load="$empData = _empAll">
+    <h2>Dynamic Data — Filter Active/Inactive</h2>
+    <p>Buttons swap data via the <code>data</code> prop (calls setData internally).</p>
 
-            // Display input showing selected count
-            var display = document.createElement("input");
-            display.type = "text";
-            display.readOnly = true;
-            display.style.cssText =
-                "width:100%;cursor:pointer;box-sizing:border-box;padding:2px 4px;font-size:12px;";
-            display.placeholder = "Filter...";
-            container.appendChild(display);
+    <div style="margin-bottom:0.75rem">
+      <button data-on:click="$filterMode = 'all'; $empData = _empAll">All</button>
+      <button data-on:click="$filterMode = 'active'; $empData = _empActive">Active Only</button>
+      <button data-on:click="$filterMode = 'inactive'; $empData = _empInactive">Inactive Only</button>
+    </div>
 
-            var selected = {};
-            var currentVal = cell.getValue();
-            if (Array.isArray(currentVal)) {
-                currentVal.forEach(function (v) {
-                    selected[v] = true;
-                });
-            }
+    <rocket-tabulator
+      columns='[{"title":"Name","field":"name","headerFilter":true},{"title":"Department","field":"department","headerFilter":true},{"title":"Active","field":"active","formatter":"tickCross","width":80}]'
+      data='[{"id":1,"name":"Alice Johnson","department":"Engineering","salary":95000,"startDate":"2020-03-15","active":true},{"id":2,"name":"Bob Smith","department":"Marketing","salary":72000,"startDate":"2019-07-22","active":true},{"id":3,"name":"Charlie Brown","department":"Engineering","salary":105000,"startDate":"2018-01-10","active":true},{"id":4,"name":"Diana Prince","department":"HR","salary":68000,"startDate":"2021-11-01","active":false},{"id":5,"name":"Eve Torres","department":"Engineering","salary":112000,"startDate":"2017-06-30","active":true},{"id":6,"name":"Frank Castle","department":"Sales","salary":78000,"startDate":"2022-02-14","active":true},{"id":7,"name":"Grace Hopper","department":"Engineering","salary":125000,"startDate":"2016-09-05","active":true},{"id":8,"name":"Hank Pym","department":"R&D","salary":98000,"startDate":"2020-08-20","active":false},{"id":9,"name":"Ivy Chen","department":"Marketing","salary":65000,"startDate":"2023-01-09","active":true},{"id":10,"name":"Jack Ryan","department":"Sales","salary":82000,"startDate":"2019-04-18","active":true}]'
+      data-attr:data="$empData"
+      height="280px"
+    ></rocket-tabulator>
 
-            function updateDisplay() {
-                var keys = Object.keys(selected);
-                display.value = keys.length ? keys.length + " selected" : "";
-            }
-            updateDisplay();
+    <div class="output">
+      Filter: <span data-text="$filterMode"></span> —
+      Rows: <span data-text="$empData ? JSON.parse($empData).length : 0"></span>
+    </div>
+  </div>
 
-            // Dropdown panel — appended to body to escape header overflow:hidden
-            var dropdown = document.createElement("div");
-            dropdown.style.cssText =
-                "display:none;position:fixed;z-index:9999;" +
-                "background:var(--clr-surface,#fff);color:var(--clr-text,#333);" +
-                "border:1px solid var(--clr-border,#ccc);box-shadow:0 2px 8px rgba(0,0,0,.25);" +
-                "min-width:180px;max-height:260px;overflow:hidden;font-size:12px;";
-
-            // Search box
-            var searchBox = document.createElement("input");
-            searchBox.type = "text";
-            searchBox.placeholder = "Search...";
-            searchBox.style.cssText =
-                "width:100%;box-sizing:border-box;padding:4px 6px;border:none;" +
-                "border-bottom:1px solid var(--clr-border,#ddd);font-size:12px;" +
-                "background:var(--clr-bg,#fff);color:var(--clr-text,#333);";
-            dropdown.appendChild(searchBox);
-
-            // Checkbox list
-            var listWrap = document.createElement("div");
-            listWrap.style.cssText =
-                "max-height:170px;overflow-y:auto;padding:4px 0;";
-            dropdown.appendChild(listWrap);
-
-            // Button bar
-            var btnBar = document.createElement("div");
-            btnBar.style.cssText =
-                "display:flex;gap:4px;padding:4px 6px;border-top:1px solid var(--clr-border,#ddd);";
-            var applyBtn = document.createElement("button");
-            applyBtn.textContent = "Apply";
-            applyBtn.style.cssText =
-                "flex:1;padding:2px 6px;font-size:11px;cursor:pointer;background:#4472c4;color:#fff;border:1px solid #3560a8;border-radius:3px;";
-            var clearBtn = document.createElement("button");
-            clearBtn.textContent = "Clear";
-            clearBtn.style.cssText =
-                "flex:1;padding:2px 6px;font-size:11px;cursor:pointer;" +
-                "background:var(--clr-bg,#f5f5f5);color:var(--clr-text,#333);" +
-                "border:1px solid var(--clr-border,#ccc);border-radius:3px;";
-            btnBar.appendChild(applyBtn);
-            btnBar.appendChild(clearBtn);
-            dropdown.appendChild(btnBar);
-
-            document.body.appendChild(dropdown);
-
-            function positionDropdown() {
-                var rect = display.getBoundingClientRect();
-                dropdown.style.top = rect.bottom + "px";
-                dropdown.style.left = rect.left + "px";
-                dropdown.style.minWidth = Math.max(180, rect.width) + "px";
-            }
-
-            // Gather unique values from column data
-            function buildList(filterText) {
-                listWrap.innerHTML = "";
-                var table = cell.getTable();
-                var vals = {};
-                table.getData().forEach(function (row) {
-                    var v = row[field];
-                    if (v !== undefined && v !== null && v !== "")
-                        vals[v] = true;
-                });
-                var sorted = Object.keys(vals).sort();
-                var ft = (filterText || "").toLowerCase();
-                sorted.forEach(function (val) {
-                    if (ft && val.toLowerCase().indexOf(ft) === -1) return;
-                    var label = document.createElement("label");
-                    label.style.cssText =
-                        "display:flex;align-items:center;gap:4px;padding:2px 6px;cursor:pointer;white-space:nowrap;";
-                    label.addEventListener("mouseover", function () {
-                        label.style.background = "var(--clr-bg,#e8f0fe)";
-                    });
-                    label.addEventListener("mouseout", function () {
-                        label.style.background = "";
-                    });
-                    var cb = document.createElement("input");
-                    cb.type = "checkbox";
-                    cb.checked = !!selected[val];
-                    cb.style.margin = "0";
-                    cb.addEventListener("change", function () {
-                        if (cb.checked) selected[val] = true;
-                        else delete selected[val];
-                    });
-                    label.appendChild(cb);
-                    label.appendChild(document.createTextNode(val));
-                    listWrap.appendChild(label);
-                });
-            }
-
-            searchBox.addEventListener("input", function () {
-                buildList(searchBox.value);
-            });
-
-            applyBtn.addEventListener("click", function (e) {
-                e.stopPropagation();
-                var keys = Object.keys(selected);
-                updateDisplay();
-                dropdown.style.display = "none";
-                success(keys.length ? keys : "");
-            });
-
-            clearBtn.addEventListener("click", function (e) {
-                e.stopPropagation();
-                selected = {};
-                buildList(searchBox.value);
-                updateDisplay();
-                dropdown.style.display = "none";
-                success("");
-            });
-
-            display.addEventListener("click", function (e) {
-                e.stopPropagation();
-                var showing = dropdown.style.display !== "none";
-                if (showing) {
-                    dropdown.style.display = "none";
-                } else {
-                    positionDropdown();
-                    dropdown.style.display = "block";
-                    searchBox.value = "";
-                    buildList("");
-                    searchBox.focus();
-                }
-            });
-
-            // Close dropdown on outside click
-            function onDocClick(e) {
-                if (
-                    !container.contains(e.target) &&
-                    !dropdown.contains(e.target)
-                ) {
-                    dropdown.style.display = "none";
-                }
-            }
-            document.addEventListener("click", onDocClick);
-            onCleanup(function () {
-                document.removeEventListener("click", onDocClick);
-                if (dropdown.parentNode)
-                    dropdown.parentNode.removeChild(dropdown);
-            });
-
-            return container;
-        }
-
-        function parseJSON(sig) {
-            try {
-                var raw = "" + (sig || "");
-                return raw ? JSON.parse(raw) : [];
-            } catch (e) {
-                return [];
-            }
-        }
-
-        function emitColumnState() {
-            clearTimeout(_colTimer);
-            _colTimer = setTimeout(function () {
-                if (!tabInstance) return;
-                var cols = tabInstance
-                    .getColumns()
-                    .filter(function (c) {
-                        return !!c.getField();
-                    })
-                    .map(function (c) {
-                        return {
-                            field: c.getField(),
-                            visible: c.isVisible(),
-                            width: c.getWidth(),
-                        };
-                    });
-                el.dispatchEvent(
-                    new CustomEvent("tab-columns-changed", {
-                        detail: { columns: cols },
-                        bubbles: true,
-                        composed: true,
-                    }),
-                );
-            }, 600);
-        }
-
-        // ── Create Tabulator once ref + import are ready ──────────
-        effect(function () {
-            if (!$$tableEl || !Tabulator) return;
-            if (tabInstance) return;
-
-            var cols = parseJSON($$columns);
-            var rows = parseJSON($$data);
-            var sort = parseJSON($$initialSort);
-
-            // Replace "checklistFilter" string with actual function
-            cols.forEach(function (c) {
-                if (c.headerFilter === "checklistFilter") {
-                    c.headerFilter = checklistFilter;
-                }
-            });
-
-            var config = {
-                data: rows,
-                layout: "" + ($$layout || "fitColumns"),
-                height: "" + ($$height || "311px"),
-                movableColumns: !!$$movableColumns,
-                resizableColumns: !!$$resizableColumns,
-                placeholder: "" + ($$placeholder || "No Data"),
-                columns: cols,
-            };
-
-            if ($$rowIndex) {
-                config.index = "" + $$rowIndex;
-            }
-
-            if (sort.length) {
-                config.initialSort = sort;
-            }
-
-            if (!!$$selectableRows) {
-                config.selectableRows = "highlight";
-                config.rowHeader = {
-                    formatter: "rowSelection",
-                    titleFormatter: "rowSelection",
-                    headerSort: false,
-                    resizable: false,
-                    frozen: true,
-                    headerHozAlign: "center",
-                    hozAlign: "center",
-                    width: 40,
-                };
-            }
-
-            if (!!$$enableRowClick) {
-                config.rowFormatter = function (row) {
-                    var rowEl = row.getElement();
-                    rowEl.style.cursor = "pointer";
-                    rowEl.addEventListener("click", function (e) {
-                        // Don't open detail when clicking the selection checkbox
-                        if (e.target.closest(".tabulator-row-header")) return;
-                        el.dispatchEvent(
-                            new CustomEvent("tab-row-click", {
-                                detail: { row: row.getData() },
-                                bubbles: true,
-                                composed: true,
-                            }),
-                        );
-                    });
-                };
-            }
-
-            tabInstance = new Tabulator($$tableEl, config);
-            el._tabInstance = tabInstance;
-
-            // seed prevDataStr so the data-watch effect only fires on real changes
-            prevDataStr = "" + ($$data || "");
-
-            tabReady = new Promise(function (resolve) {
-                tabInstance.on("tableBuilt", resolve);
-            });
-            tabInstance.on("columnMoved", emitColumnState);
-            tabInstance.on("columnResized", emitColumnState);
-            tabInstance.on("columnVisibilityChanged", emitColumnState);
-
-            if (!!$$selectableRows) {
-                function emitSelection() {
-                    el.dispatchEvent(
-                        new CustomEvent("tab-rows-selected", {
-                            detail: { rows: tabInstance.getSelectedData() },
-                            bubbles: true,
-                            composed: true,
-                        }),
-                    );
-                }
-                tabInstance.on("rowSelected", emitSelection);
-                tabInstance.on("rowDeselected", emitSelection);
-            }
-        });
-
-        // ── Data swap (preserves column state, sort, filters) ─────
-        var prevDataStr = "";
-        effect(function () {
-            if (!tabInstance) return;
-            var dataStr = "" + ($$data || "");
-            if (dataStr !== prevDataStr) {
-                prevDataStr = dataStr;
-                tabReady.then(function () {
-                    try {
-                        var parsed = dataStr ? JSON.parse(dataStr) : [];
-                        tabInstance.setData(parsed);
-                    } catch (e) {}
-                });
-            }
-        });
-
-        // ── Column picker with drag-to-reorder (visibility + order) ──
-        // Call from outside: document.getElementById('myGrid')._showColPicker(anchorBtn)
-        var _colPickerPanel = null;
-        var _colPickerCleanup = null;
-
-        el._showColPicker = function (anchorEl) {
-            if (!tabInstance) return;
-
-            // Toggle off if already open
-            if (_colPickerPanel) {
-                _colPickerPanel.remove();
-                _colPickerPanel = null;
-                if (_colPickerCleanup) _colPickerCleanup();
-                _colPickerCleanup = null;
-                return;
-            }
-
-            var table = tabInstance;
-            var allCols = table.getColumns().filter(function (c) { return !!c.getField(); });
-            var colCount = allCols.length;
-
-            // Auto-column layout: 30 fields per picker column (1 col ≤30, 2 cols ≤60, etc.)
-            var numCols = Math.max(1, Math.ceil(colCount / 30));
-
-            var panel = document.createElement("div");
-            _colPickerPanel = panel;
-            panel.style.cssText = "position:fixed;z-index:1000;" +
-                "background:var(--clr-surface,#fff);color:var(--clr-text,#333);" +
-                "border:1px solid var(--clr-border,#ccc);" +
-                "border-radius:4px;padding:6px 4px;max-height:750px;overflow-y:auto;" +
-                "box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:12px;" +
-                "column-count:" + numCols + ";column-gap:8px;min-width:" + (numCols * 180) + "px;";
-
-            var dragSrc = null;
-
-            allCols.forEach(function (col) {
-                var def = col.getDefinition();
-                var row = document.createElement("div");
-                row.draggable = true;
-                row.dataset.field = def.field;
-                row.style.cssText = "display:flex;align-items:center;gap:4px;padding:2px 4px;" +
-                    "cursor:pointer;border-radius:3px;white-space:nowrap;break-inside:avoid;";
-
-                // Drag handle
-                var grip = document.createElement("span");
-                grip.textContent = "\u2807";
-                grip.style.cssText = "cursor:grab;opacity:.5;font-size:14px;user-select:none;color:var(--clr-text,#666);";
-                row.appendChild(grip);
-
-                var cb = document.createElement("input");
-                cb.type = "checkbox";
-                cb.checked = col.isVisible();
-                cb.style.cssText = "margin:0;cursor:pointer;";
-                cb.addEventListener("change", function (e) {
-                    e.stopPropagation();
-                    col.toggle();
-                    emitColumnState();
-                });
-                row.appendChild(cb);
-                row.appendChild(document.createTextNode(" " + (def.title || def.field)));
-
-                row.addEventListener("mouseover", function () { row.style.background = "var(--clr-bg,#f0f4ff)"; });
-                row.addEventListener("mouseout", function () { row.style.background = ""; });
-
-                // Drag events
-                row.addEventListener("dragstart", function (e) {
-                    dragSrc = row;
-                    row.style.opacity = ".4";
-                    e.dataTransfer.effectAllowed = "move";
-                });
-                row.addEventListener("dragend", function () {
-                    dragSrc = null;
-                    row.style.opacity = "";
-                    panel.querySelectorAll("div").forEach(function (d) {
-                        d.style.borderTop = "";
-                    });
-                });
-                row.addEventListener("dragover", function (e) {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                    if (dragSrc && row !== dragSrc) row.style.borderTop = "2px solid #4472c4";
-                });
-                row.addEventListener("dragleave", function () {
-                    row.style.borderTop = "";
-                });
-                row.addEventListener("drop", function (e) {
-                    e.preventDefault();
-                    row.style.borderTop = "";
-                    if (!dragSrc || dragSrc === row) return;
-                    panel.insertBefore(dragSrc, row);
-                    table.moveColumn(dragSrc.dataset.field, row.dataset.field, true);
-                    emitColumnState();
-                });
-
-                panel.appendChild(row);
-            });
-
-            // Position below anchor, clamped to viewport
-            var rect = anchorEl ? anchorEl.getBoundingClientRect()
-                                : el.getBoundingClientRect();
-            document.body.appendChild(panel);
-            var panelRect = panel.getBoundingClientRect();
-            var top = rect.bottom + 4;
-            var maxTop = window.innerHeight - panelRect.height - 4;
-            if (top > maxTop) top = Math.max(4, maxTop);
-            panel.style.top = top + "px";
-            panel.style.left = rect.left + "px";
-
-            // Close on outside click
-            function onDown(e) {
-                if (!panel.contains(e.target) && e.target !== anchorEl) {
-                    panel.remove();
-                    _colPickerPanel = null;
-                    document.removeEventListener("mousedown", onDown);
-                    _colPickerCleanup = null;
-                }
-            }
-            setTimeout(function () {
-                document.addEventListener("mousedown", onDown);
-            }, 50);
-            _colPickerCleanup = function () {
-                document.removeEventListener("mousedown", onDown);
-            };
-        };
-
-        // ── Cleanup ───────────────────────────────────────────────
-        onCleanup(function () {
-            clearTimeout(_colTimer);
-            if (_colPickerPanel) { _colPickerPanel.remove(); _colPickerPanel = null; }
-            if (_colPickerCleanup) { _colPickerCleanup(); _colPickerCleanup = null; }
-            if (tabInstance) {
-                tabInstance.destroy();
-                tabInstance = null;
-            }
-        });
-    </script>
-
-    <div data-ref="tableEl" style="width: 100%"></div>
-</template>
+  <datastar-inspector></datastar-inspector>
+</body>
+</html>

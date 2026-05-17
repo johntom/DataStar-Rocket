@@ -1,8 +1,15 @@
-# 🚀Rocket Tom Select with datastar 1.0.0  
+# 🚀Rocket Tom Select with datastar 1.0.1  
 
 A Datastar **Rocket** version 1 web component wrapping [Tom Select](https://tom-select.js.org/).
 Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) License.
 
+## Version
+
+| Field          | Value        |
+| -------------- | ------------ |
+| `VERSION`      | `2.0.1` |
+| `VERSION_date` | `05/16/26` |
+| `VERSION_mess` | `Uses Datastar-pro 1.0.1` |
 
 <!--Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)-->
 
