@@ -1,4 +1,4 @@
-# 🚀Rocket Tom Select with datastar 1.0.1  
+# 🚀Rocket Tom Select with datastar 1.0.1    
 
 A Datastar **Rocket** version 1 web component wrapping [Tom Select](https://tom-select.js.org/).
 Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) License.
@@ -7,7 +7,7 @@ Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) Licen
 
 | Field          | Value        |
 | -------------- | ------------ |
-| `VERSION`      | `2.0.1` |
+| `VERSION`      | `2.0.2` |
 | `VERSION_date` | `05/16/26` |
 | `VERSION_mess` | `Uses Datastar-pro 1.0.1` |
 
@@ -32,25 +32,28 @@ npm run start
 |------|------|---------|-------------|
 | `placeholder` | string | `"Select..."` | Placeholder text |
 | `max-items` | int | `1` | Max selectable items |
-| `options` | json | `[]` | Array of `{value, text}` objects |
-| `value` | string | `""` | Current value (comma-separated for multi) |
+| `options` | string (JSON) | `""` | JSON array of `{value, text, ...}` objects |
+| `value` | string | `""` | Current value (comma-separated for multi); reflected back to the `value` attribute on change |
 | `allow-create` | boolean | `false` | Allow creating new items |
-| `search-url` | string | `""` | Backend URL for remote search |
+| `detail-field` | string | `""` | Comma-separated extra fields to render in the dropdown / selected pill (e.g. `"origin,season"`) |
+| `search-url` | string | `""` | Backend URL for remote search (`?q=` → JSON `[{value,text}]`) |
 | `check-options` | boolean | `false` | Checkbox multi-select with Apply/Clear buttons |
+| `dropdown-parent` | string | `""` | Selector for the element the dropdown is rendered into (e.g. `"body"`) |
 
 ### Events
 
-The component dispatches a `change` CustomEvent with `detail.value` containing the selected value(s).
+The component emits a `ts-change` CustomEvent on the host element with `detail.value` containing the selected value(s) — comma-separated when multi-select. Bind it with `data-on:ts-change`.
 
 ### Usage Examples
 
-**Single select with static options:**
+**Single select with static options (plus extra detail columns):**
 ```html
 <div data-signals:fruit="''">
   <rocket-tom-select
-    data-attr:placeholder="'Pick one...'"
-    data-attr:options='[{"value":"a","text":"Apple"}]'
-    data-on:change="$fruit = evt.detail.value"
+    placeholder="Pick one..."
+    options='[{"value":"apple","text":"Apple","origin":"Central Asia"}]'
+    detail-field="origin"
+    data-on:ts-change="$fruit = evt.detail.value"
   ></rocket-tom-select>
 </div>
 ```
@@ -58,19 +61,19 @@ The component dispatches a `change` CustomEvent with `detail.value` containing t
 **Multi-select with tagging:**
 ```html
 <rocket-tom-select
-  data-attr:placeholder="'Choose...'"
-  data-attr:max-items="'5'"
-  data-attr:options='[...]'
-  data-on:change="$items = evt.detail.value"
+  placeholder="Choose..."
+  max-items="5"
+  options='[...]'
+  data-on:ts-change="$items = evt.detail.value"
 ></rocket-tom-select>
 ```
 
 **Remote search:**
 ```html
 <rocket-tom-select
-  data-attr:placeholder="'Search...'"
-  data-attr:search-url="'/api/search'"
-  data-on:change="$user = evt.detail.value"
+  placeholder="Search..."
+  search-url="/api/search"
+  data-on:ts-change="$user = evt.detail.value"
 ></rocket-tom-select>
 ```
 
@@ -91,33 +94,39 @@ When `check-options` is set, the dropdown shows checkboxes next to each option w
 **Creatable tags with backend sync:**
 ```html
 <rocket-tom-select
-  data-attr:placeholder="'Add tags...'"
-  data-attr:max-items="'10'"
-  data-attr:allow-create="'true'"
-  data-on:change="$tags = evt.detail.value; @get('/api/save-tags')"
+  placeholder="Add tags..."
+  max-items="10"
+  allow-create="true"
+  data-on:ts-change="$tags = evt.detail.value; @post('/api/save-tags')"
 ></rocket-tom-select>
 ```
 
 ## How It Works
 
-The Rocket component:
+This is a **Datastar Pro v1.0.1 JS-API component**, not an RC-era `<template data-rocket:>`. It is implemented in `static/components/tom-select-rocket.js` and registered with:
 
-1. **Defines** via `<template data-rocket:rocket-tom-select>` with typed props
-2. **Imports** Tom Select as IIFE via `data-import:TomSelect__iife`
-3. **Initializes** when both `$$selectEl` (via `data-ref`) and `TomSelect` are available
-4. **Syncs** `$$value` ↔ Tom Select instance bidirectionally using effects
-5. **Dispatches** `change` events on the host `el` for Datastar `data-on:change` binding
-6. **Cleans up** via `onCleanup()` when the component is removed from DOM
+```js
+import { rocket } from '/static/datastar-pro.js'
+rocket('rocket-tom-select', { mode: 'light', renderOnPropChange: false, props, render, onFirstRender })
+```
 
-### Signal Scoping
+1. **Registers** the `<rocket-tom-select>` element via `rocket(tag, def)` (light DOM, `renderOnPropChange: false`)
+2. **Declares typed props** in `props: ({ string, number, bool }) => ({ ... })` — read from plain HTML attributes
+3. **Renders** a single `<select data-rocket-ref="selectEl">` accessed in code as `refs.selectEl`
+4. **Self-loads** the Tom Select JS from the CDN by injecting a `<script>` (only the CSS `<link>` is needed in the page)
+5. **Initializes** the Tom Select instance in `onFirstRender` once the script resolves
+6. **Syncs** `options` and `value` reactively via `observeProps(...)`; on user change it reflects back to the `value` attribute and calls `emit('ts-change', { value })`
+7. **Cleans up** via `cleanup()` — destroys the Tom Select instance when the element leaves the DOM
 
-- `$$value`, `$$options`, etc. are **component-scoped** — each instance is isolated
-- `$fruit`, `$selectedUser` etc. are **global signals** — shared across the page
-- The `data-on:change` bridges component → global via `evt.detail.value`
+### Props & Binding
+
+- Props are set as **plain attributes** (`placeholder="..."`, `options='[...]'`) or reactively via `data-attr:` — each element instance is isolated
+- `$fruit`, `$selectedUser`, etc. are **page signals** — shared across the page
+- The `data-on:ts-change` handler bridges the component → page signals via `evt.detail.value`
 
 ## CSS
 
-Tom Select CSS is loaded globally via `<link>` tag. The component uses **light DOM** (no shadow DOM), so styles apply naturally.
+The component self-loads the Tom Select **JS** from the CDN, so only the **CSS** is required in the page. It uses **light DOM** (`mode: 'light'`, no shadow DOM), so styles apply naturally.
 
 ```html
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.1/dist/css/tom-select.css" />
@@ -125,16 +134,16 @@ Tom Select CSS is loaded globally via `<link>` tag. The component uses **light D
 
 ---
 
-## Rocket Tabulator Component RC.8  
+## Rocket Tabulator Component v1.0.1
 
-A Datastar **Rocket** web component wrapping [Tabulator 6.3](https://tabulator.info/). Defined in `tabulator-rocket.html`.
+A Datastar **Rocket** v1.0.1 JS-API web component wrapping [Tabulator 6.3](https://tabulator.info/). Implemented in `static/components/tabulator-rocket.js`; demo page is `tabulator-rocket.html`. Unlike the Tom Select component, this one expects `window.Tabulator` to be **preloaded** — include the Tabulator JS `<script>` in the page.
 
 ### `<rocket-tabulator>`
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `columns` | string (JSON) | `[]` | Tabulator column definitions |
-| `data` | string (JSON) | `[]` | Row data array |
+| `columns` | string (JSON) | `""` | Tabulator column definitions |
+| `data` | string (JSON) | `""` | Row data array |
 | `height` | string | `"311px"` | CSS height for the grid |
 | `layout` | string | `"fitColumns"` | Tabulator layout mode |
 | `placeholder` | string | `"No Data"` | Empty-table message |
@@ -142,7 +151,9 @@ A Datastar **Rocket** web component wrapping [Tabulator 6.3](https://tabulator.i
 | `resizable-columns` | boolean | `true` | Allow column resize |
 | `enable-row-click` | boolean | `false` | Attach row click handlers |
 | `selectable-rows` | boolean | `false` | Show checkbox column for row selection |
-| `initial-sort` | string (JSON) | `[]` | Sort config `[{column, dir}]` |
+| `initial-sort` | string (JSON) | `""` | Sort config `[{column, dir}]` |
+| `initial-filters` | string (JSON) | `""` | Server-saved header filters `[{field, value}]`, applied once the table is built |
+| `row-index` | string | `""` | Field name to use as the Tabulator row index |
 
 ### Events
 
@@ -220,16 +231,27 @@ A built-in multi-select checklist header filter with search, checkboxes, and App
 - Auto-populates unique values from column data
 - Search box to narrow the list
 - Checkboxes for multi-selection
-- Apply button commits the filter, Clear button resets it
+- Apply button commits the filter (emits the selected array; pair with `headerFilterFunc: "in"`), Clear button resets it
 - Display shows "N selected" when active
-- Dropdown appended to `document.body` to escape header `overflow:hidden`
+- Dropdown appended to `document.body` (`position:fixed`) to escape header `overflow:hidden`
+- Per-cell listeners are torn down on component cleanup
+
+### String-resolved Column Helpers
+
+The same resolution pass also swaps these string placeholders in column definitions for built-in functions:
+
+| Definition key | String value | Effect |
+|----------------|--------------|--------|
+| `formatter` | `"isoDate"` | Formats `YYYY-MM-DD…` values as `MM/DD/YYYY` |
+| `formatter` | `"notesWrap"` | Wrapping multi-line cell; click opens a full-text popup (also sets a truncating tooltip) |
+| `headerFilter` | `"checklistFilter"` | The multi-select checklist filter above |
 
 ### Column Picker: `_showColPicker(anchorEl)`
 
 A built-in column picker with visibility checkboxes and drag-to-reorder. Call it from any button via the element method:
 
 ```html
-<button onclick="document.getElementById('my-grid')._showColPicker(this)">
+<button data-on:click="document.getElementById('my-grid')._showColPicker(el)">
   Columns
 </button>
 <rocket-tabulator id="my-grid" columns='...' data='...'></rocket-tabulator>
@@ -237,13 +259,13 @@ A built-in column picker with visibility checkboxes and drag-to-reorder. Call it
 
 **Features:**
 - Checkboxes to toggle column visibility
-- Drag handles (⠿) to reorder columns via drag-and-drop
-- Calls `table.moveColumn()` to reorder the grid on drop
+- Drag handles (⠇) to reorder columns via drag-and-drop
+- Calls Tabulator's `moveColumn()` to reorder the grid on drop
 - Emits `tab-columns-changed` event after reorder or visibility change
-- Auto-column layout based on field count:
-  - `< 20` fields → 1 column
-  - `20–39` fields → 2 columns
-  - `40+` fields → 3 columns
+- Multi-column popup layout based on field count: `Math.ceil(fields / 30)` columns
+  - 1–30 fields → 1 column
+  - 31–60 fields → 2 columns
+  - 61–90 fields → 3 columns
 - Toggle: clicking the button again closes the picker
 - Appended to `document.body` with `position:fixed`
 
