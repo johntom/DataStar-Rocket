@@ -19,7 +19,7 @@ echo [3/5] Pulling latest main from origin...
 git pull origin main
 if errorlevel 1 goto :error
 echo.
-paude
+pause
 echo [4/5] Staging changes...
 git add -A
 if errorlevel 1 goto :error
