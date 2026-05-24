@@ -2,23 +2,24 @@
 setlocal
 echo Git: update main
 echo ==================
+echo see https://github.com/johntom/DataStar-Rocket
 echo.
-
+pause
 echo [1/5] Refreshing README.md version block from .env (VERSION, VERSION_date, VERSION_mess)...
 call npm run update-readme
 if errorlevel 1 goto :error
 echo.
-
+pause
 echo [2/5] Switching to main branch...
 git checkout main
 if errorlevel 1 goto :error
 echo.
-
+pause
 echo [3/5] Pulling latest main from origin...
 git pull origin main
 if errorlevel 1 goto :error
 echo.
-
+paude
 echo [4/5] Staging changes...
 git add -A
 if errorlevel 1 goto :error
@@ -37,7 +38,7 @@ if not defined MSG (
 git commit -m "%MSG%"
 if errorlevel 1 goto :error
 echo.
-
+pause
 echo [5/5] Pushing main to origin...
 git push origin main
 if errorlevel 1 goto :error

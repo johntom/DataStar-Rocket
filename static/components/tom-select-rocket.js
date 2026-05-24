@@ -2,7 +2,8 @@
 // Public contract preserved from the RC.7/8 template version:
 //   tag:    <rocket-tom-select>
 //   props:  placeholder, max-items, options, value, allow-create,
-//           detail-field, search-url, check-options, dropdown-parent
+//           detail-field, search-url, check-options, dropdown-parent,
+//           auto-select-single
 //   emits:  ts-change CustomEvent { detail: { value: string } }
 
 import { rocket } from '/static/datastar-pro.js'
@@ -46,6 +47,19 @@ rocket('rocket-tom-select', {
     searchUrl: string.default(''),
     checkOptions: bool.default(false),
     dropdownParent: string.default(''),
+    // When the user's typing narrows the dropdown to a single remaining
+    // option, auto-select it. Two code paths: onType (local-option pickers,
+    // sync filter) and the post-load event (remote search-url pickers,
+    // async results).
+    // Single-select picker: setValue + close + blur.
+    // Multi / check-options picker: addItem + clear typed text so the user
+    //   can keep filtering for more matches.
+    // Default: ON for single-select (max-items=1, no check-options); OFF
+    // for multi / check-options (would hijack the typed text mid-filter).
+    // Override either way with auto-select-single="true" / "false". The
+    // attribute is re-read live on every keystroke / load, so it can be
+    // toggled at runtime (e.g. via data-attr in Datastar).
+    autoSelectSingle: bool.default(false),
   }),
 
   render: ({ html }) => html`<select data-rocket-ref="selectEl"></select>`,
@@ -54,6 +68,42 @@ rocket('rocket-tom-select', {
     let tsInstance = null
     let prevOptionsStr = ''
     let lastSyncedValue = ''
+
+    // Shared auto-select-single resolver. Called from config.onType
+    // (local-option pickers, sync filter) AND from a post-init 'load'
+    // listener (remote search-url pickers, async results). Both call sites
+    // are always wired; _autoSelectActive() is the per-call gate.
+    const isMulti = !!props.checkOptions || (props.maxItems || 1) > 1
+    // Live check — re-read the raw attribute on every call so callers can
+    // toggle auto-select-single at runtime (e.g. data-attr:auto-select-single
+    // in the demo). bool.default(false) collapses "unset" and explicit
+    // "false", so we read the raw attribute: unset → ON for single-select
+    // / OFF for multi; explicit "false"/"0" → off; anything else → on.
+    function _autoSelectActive() {
+      const raw = host.getAttribute('auto-select-single')
+      if (raw === null) return !isMulti
+      return raw !== 'false' && raw !== '0'
+    }
+    function _tryAutoSelectSingle(ts) {
+      if (!ts) return
+      if (!_autoSelectActive()) return
+      const items = ts.currentResults && ts.currentResults.items
+      if (!items || items.length !== 1) return
+      const only = items[0].id
+      const current = ts.getValue()
+      const alreadyHas = Array.isArray(current)
+        ? current.indexOf(only) !== -1
+        : current === only
+      if (alreadyHas) return
+      if (isMulti) {
+        ts.addItem(only, false)        // add to selection
+        ts.setTextboxValue('')          // clear typed text for next filter
+      } else {
+        ts.setValue(only, false)        // false → fire onChange / ts-change
+        ts.close()
+        ts.blur()
+      }
+    }
 
     function buildConfig(TomSelect) {
       const opts = parseOptions(props.options)
@@ -91,6 +141,25 @@ rocket('rocket-tom-select', {
         config.onChange = function () {} // Apply button fires it
       } else if ((props.maxItems || 1) > 1) {
         config.plugins.remove_button = { title: 'Remove' }
+      }
+
+      // Auto-resolve when typing narrows the dropdown to a single option.
+      // Always wired; the per-call _autoSelectActive() gate decides whether
+      // to actually fire (supports runtime toggling of the attribute).
+      // Two call sites:
+      //   • onType  → local-option pickers (TomSelect filters currentResults
+      //     synchronously, so setTimeout(0) lets that pass finish before we
+      //     inspect items).
+      //   • 'load' event (wired post-init below) → remote search-url pickers
+      //     (results arrive AFTER the keystroke; onType already ran and saw 0).
+      // Single-select  → setValue + close + blur.
+      // Multi / check-options → addItem and clear the typed text so the user
+      //   can keep filtering for more matches (the check-options Apply /
+      //   dropdown_close auto-apply still gate the actual search).
+      config.onType = function (query) {
+        if (!query) return
+        var self = this
+        setTimeout(function () { _tryAutoSelectSingle(self) }, 0)
       }
 
       if (opts.length > 0) {
@@ -153,16 +222,31 @@ rocket('rocket-tom-select', {
       clearBtn.textContent = 'Clear'
       clearBtn.style.cssText = 'flex:1;padding:2px 6px;font-size:11px;cursor:pointer;background:var(--clr-bg,#f5f5f5);color:var(--clr-text,#333);border:1px solid var(--clr-border,#ccc);border-radius:3px;'
       const ts = tsInstance
+      const norm = (v) => (Array.isArray(v) ? v.join(',') : ('' + (v || '')))
+      // Value last emitted via ts-change; used so the dropdown-close
+      // auto-apply doesn't fire a duplicate emit right after Apply/Clear.
+      let lastApplied = norm(ts.getValue())
+      function apply (val) {
+        lastApplied = norm(val)
+        fireChange.call(ts, val)
+      }
       applyBtn.addEventListener('click', (e) => {
         e.stopPropagation()
-        fireChange.call(ts, ts.getValue())
+        apply(ts.getValue())
         ts.close()
       })
       clearBtn.addEventListener('click', (e) => {
         e.stopPropagation()
         ts.clear(true)
-        fireChange.call(ts, '')
+        apply('')
         ts.close()
+      })
+      // Auto-apply on dropdown close (click-away / Escape / done selecting)
+      // when the value changed since the last apply — so picking a filter
+      // refreshes without hunting for the Apply button. Explicit Apply/Clear
+      // still work; no-ops when the value is unchanged.
+      ts.on('dropdown_close', () => {
+        if (norm(ts.getValue()) !== lastApplied) apply(ts.getValue())
       })
       bar.appendChild(applyBtn)
       bar.appendChild(clearBtn)
@@ -182,6 +266,14 @@ rocket('rocket-tom-select', {
         prevOptionsStr = props.options || ''
         lastSyncedValue = props.value || ''
         attachCheckboxBar()
+        // Remote-picker auto-select: re-evaluate after each async load
+        // completes (onType already ran before fetch returned and saw 0).
+        // The helper short-circuits if auto-select is currently inactive.
+        if (props.searchUrl) {
+          tsInstance.on('load', function () {
+            _tryAutoSelectSingle(tsInstance)
+          })
+        }
       })
       .catch((e) => console.error('[rocket-tom-select]', e))
 

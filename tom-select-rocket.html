@@ -68,7 +68,8 @@
   <!-- Example 1: Single Select with Static Options          -->
   <!-- ═══════════════════════════════════════════════════════ -->
   <div class="card" data-signals:selectedFruit="''">
-    <h2>Single Select — Three-Column Dropdown</h2>
+    <h2>Single Select — Three-Column Dropdown with auotfill </h2>
+
     <p>Pick one fruit. Dropdown shows origin and season. Selected pill shows all three.</p>
 
     <rocket-tom-select
@@ -90,9 +91,17 @@
     <h2>Multi-Select — Tagging</h2>
     <p>Pick up to 5 fruits. Includes remove buttons on tags. Hold shift to select multiples from list.</p>
 
-    <rocket-tom-select
+    <label style="display:inline-flex;align-items:center;gap:.4rem;font-size:.9rem;color:#444;margin-bottom:.25rem">
+      <input type="checkbox"
+        data-on:change="document.getElementById('multi-fruit-picker').setAttribute('auto-select-single', evt.target.checked ? 'true' : 'false')" />
+      Auto-select on single match
+      <span style="color:#888">— type e.g. <code>kiw</code> or <code>che</code>; the lone match is added automatically</span>
+    </label>
+
+    <rocket-tom-select id="multi-fruit-picker"
       placeholder="Choose fruits..."
       max-items="5"
+      auto-select-single="false"
       options='[{"value":"apple","text":"Apple","origin":"Central Asia","season":"Fall"},{"value":"banana","text":"Banana","origin":"Southeast Asia","season":"Year-round"},{"value":"cherry","text":"Cherry","origin":"Europe","season":"Summer"},{"value":"dragonfruit","text":"Dragon Fruit","origin":"Central America","season":"Summer"},{"value":"elderberry","text":"Elderberry","origin":"Europe","season":"Late Summer"},{"value":"fig","text":"Fig","origin":"Mediterranean","season":"Late Summer"},{"value":"grape","text":"Grape","origin":"Near East","season":"Fall"},{"value":"honeydew","text":"Honeydew","origin":"West Africa","season":"Summer"},{"value":"kiwi","text":"Kiwi","origin":"China","season":"Winter"},{"value":"lemon","text":"Lemon","origin":"South Asia","season":"Year-round"},{"value":"mango","text":"Mango","origin":"South Asia","season":"Summer"},{"value":"nectarine","text":"Nectarine","origin":"China","season":"Summer"},{"value":"orange","text":"Orange","origin":"Southeast Asia","season":"Winter"},{"value":"papaya","text":"Papaya","origin":"Central America","season":"Year-round"},{"value":"quince","text":"Quince","origin":"Caucasus","season":"Fall"}]'
       data-on:ts-change="$selectedFruits = evt.detail.value"
     ></rocket-tom-select>
