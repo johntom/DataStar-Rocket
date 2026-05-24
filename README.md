@@ -1,5 +1,5 @@
 # 🚀Rocket Tom Select with datastar 1.0.1    
-
+  
 A Datastar **Rocket** version 1 web component wrapping [Tom Select](https://tom-select.js.org/).
 Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) License.
 
@@ -39,6 +39,7 @@ npm run start
 | `search-url` | string | `""` | Backend URL for remote search (`?q=` → JSON `[{value,text}]`) |
 | `check-options` | boolean | `false` | Checkbox multi-select with Apply/Clear buttons |
 | `dropdown-parent` | string | `""` | Selector for the element the dropdown is rendered into (e.g. `"body"`) |
+| `auto-select-single` | boolean | mode-dependent | When typing narrows the dropdown to a single match, auto-resolve it (single-select: `setValue` + close; multi: `addItem` + clear textbox so the user can keep filtering). **Defaults ON for single-select** (`max-items=1`, no `check-options`); **OFF for multi / check-options**. Override either way with `auto-select-single="true"` / `"false"`. Re-read live, so it can be toggled at runtime via `setAttribute`. |
 
 ### Events
 

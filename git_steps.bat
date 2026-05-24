@@ -53,4 +53,5 @@ echo *** A step failed (errorlevel %errorlevel%). Stopped - nothing further was 
 
 :end
 endlocal
+echo see https://github.com/johntom/DataStar-Rocket
 pause
