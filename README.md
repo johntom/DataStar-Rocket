@@ -7,8 +7,8 @@ Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) Licen
 
 | Field          | Value        |
 | -------------- | ------------ |
-| `VERSION`      | `2.0.2` |
-| `VERSION_date` | `05/16/26` |
+| `VERSION`      | `2.0.4` |
+| `VERSION_date` | `05/24/26` |
 | `VERSION_mess` | `Uses Datastar-pro 1.0.1` |
 
 <!--Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)-->
