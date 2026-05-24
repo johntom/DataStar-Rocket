@@ -29,11 +29,12 @@ git diff --cached --quiet && (
 )
 git status --short
 echo.
+:prompt_msg
 set "MSG="
-set /p "MSG=Commit message (leave blank to cancel): "
+set /p "MSG=Commit message (Ctrl+C to cancel): "
 if not defined MSG (
-  echo No message entered - nothing committed. Exiting.
-  goto :end
+  echo Message required - please type a commit message. Use Ctrl+C to cancel.
+  goto :prompt_msg
 )
 git commit -m "%MSG%"
 if errorlevel 1 goto :error
