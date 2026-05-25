@@ -274,6 +274,36 @@ rocket('rocket-tom-select', {
             _tryAutoSelectSingle(tsInstance)
           })
         }
+        // Custom dropdown-parent positioning fix.
+        //   TomSelect's internal positionDropdown() only runs when
+        //   dropdownParent is 'body' (the default). When you set
+        //   dropdownParent to a custom element — required for pickers
+        //   inside a native <dialog> opened with showModal() so the
+        //   dropdown participates in the top-layer — positionDropdown
+        //   bails. The dropdown's CSS then uses its default `top: 100%`
+        //   rule, which means 100% of the PARENT's height — so the
+        //   dropdown ends up at the bottom of the custom parent (often
+        //   off-screen ~y=900px in a tall dialog), not below the input.
+        //
+        //   Fix: on every dropdown_open, manually anchor the dropdown to
+        //   the .ts-control (the input wrapper) using offsets computed
+        //   relative to the dropdown's parent. This mirrors what
+        //   TomSelect's own positionDropdown does for the body parent.
+        if (props.dropdownParent) {
+          tsInstance.on('dropdown_open', function () {
+            try {
+              const ctrl = tsInstance.control
+              const dd   = tsInstance.dropdown
+              const pe   = dd.parentElement
+              if (!ctrl || !dd || !pe) return
+              const cRect = ctrl.getBoundingClientRect()
+              const pRect = pe.getBoundingClientRect()
+              dd.style.top   = (cRect.bottom - pRect.top)  + 'px'
+              dd.style.left  = (cRect.left   - pRect.left) + 'px'
+              dd.style.width = cRect.width + 'px'
+            } catch (e) { /* non-fatal: dropdown still renders */ }
+          })
+        }
       })
       .catch((e) => console.error('[rocket-tom-select]', e))
 
