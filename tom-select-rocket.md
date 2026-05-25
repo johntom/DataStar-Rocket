@@ -310,9 +310,22 @@ ts.setValue(String(newId), false)   // false → fire onChange / ts-change
 - **TomSelect wraps the `<select>` in `.ts-wrapper`.** Layout rules that
   target the picker by class need `.ts-wrapper` selectors.
 
-- **`dropdown-parent="body"` for tight containers.** Inside grids, modal
-  bodies, or `overflow:hidden` panels the dropdown is clipped. Setting
-  `dropdown-parent="body"` lets it escape to `<body>`.
+- **`dropdown-parent` for tight containers — two cases.**
+  - **Regular containers** (grids, `overflow:hidden` panels, modal `<div>`
+    overlays): set `dropdown-parent="body"` so the dropdown escapes the
+    clipping ancestor and renders against the page body. TomSelect's
+    built-in `positionDropdown()` handles the absolute coords correctly
+    for the body parent.
+  - **Native `<dialog>` opened with `dialog.showModal()`**: `<body>`
+    children are occluded by the dialog's top-layer, so a body-parented
+    dropdown is invisible. Set `dropdown-parent="#<your-dialog-id>"` so
+    the dropdown participates in the same top-layer. When `dropdownParent`
+    is anything OTHER than `'body'`, the component installs a
+    `dropdown_open` listener that manually anchors the dropdown below
+    the `.ts-control` input wrapper — without this, TomSelect's default
+    CSS `top: 100%` would place the dropdown at the bottom edge of the
+    dialog (often off-screen). The fix is automatic; no extra config
+    needed beyond the `dropdown-parent` attribute itself.
 
 ## Internals
 
