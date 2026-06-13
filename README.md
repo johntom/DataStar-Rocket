@@ -7,9 +7,9 @@ Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) Licen
 
 | Field          | Value        |
 | -------------- | ------------ |
-| `VERSION`      | `2.0.7` |
+| `VERSION`      | `2.0.8` |
 | `VERSION_date` | `06/12/26` |
-| `VERSION_mess` | `Uses Datastar-pro 1.0.1 - fixed same dialog on different views` |
+| `VERSION_mess` | `tabulator-rocket: tab-sorted event + sort restore, filter-bar, lock-column-order, column-calcs/group-toggle, formatter/sorter tokens; docs updated` |
 
 <!--Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)-->
 

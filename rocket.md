@@ -104,7 +104,16 @@ A Datastar Rocket web component wrapping [Tabulator 6.3](https://tabulator.info/
 | `resizable-columns` | bool | `true` | Allow column resize |
 | `enable-row-click` | bool | `false` | Attach row click handlers |
 | `selectable-rows` | bool | `false` | Show checkbox column for row selection |
-| `initial-sort` | str | `""` | JSON string of `[{column, dir}]` sort config |
+| `initial-sort` | str | `""` | JSON string of `[{column, dir}]` sort config. Restored on build: the sort is **applied** (rows reordered) after the table is built, including for grids that build empty and stream rows in via a later data swap — not merely registered. |
+| `filter-bar` | bool | `false` | Show a blue active-filter status footer (legacy-grid style). Summarizes the live header + programmatic filters as `(Title op value) AND …`, plus an `N of M rows` count and a clear-all (`✕`) button. Collapses when no filter is active. |
+| `lock-column-order` | bool | `false` | Make the column picker **hide/show only** — omits the drag-to-reorder grip and drag handlers. Other reorder paths (header drag via `movable-columns`) are unaffected. |
+| `column-calcs` | str | `""` | Tabulator column-calculation placement: `""` (off), `both`, `group`, or `table`. `both`/`group` produce per-group subtotal rows when grouping. Per-column `bottomCalc` in the column defs is independent of this. |
+| `group-toggle` | str | `""` | Group toggle element (maps to Tabulator `groupToggleElement`): `""` (default arrow), `header` (whole group header click-toggles collapse), or `arrow`. |
+
+Two host properties are also exposed for grids driven post-construction:
+
+- **`host._tabReady`** — a promise resolving after `tableBuilt`. Grids that call `host._tabInstance.setColumns()/replaceData()` after construction (columns carrying live formatter/sorter closures that can't go through the JSON `columns` attribute) must `await` it so resize handles bind.
+- **`host._checklistFilter`** — the Apply/Clear checklist header-filter factory, for those same post-construction grids to resolve the `checklistFilter` token themselves.
 
 ### Events
 
@@ -113,6 +122,7 @@ A Datastar Rocket web component wrapping [Tabulator 6.3](https://tabulator.info/
 | `tab-row-click` | `{ row: object }` | Fires on row click (requires `enable-row-click`) |
 | `tab-rows-selected` | `{ rows: array }` | Fires on select/deselect (requires `selectable-rows`) |
 | `tab-columns-changed` | `{ columns: [{field, visible, width}] }` | Debounced 600ms on column move/resize/visibility change |
+| `tab-sorted` | `{ sorters: [{field, dir, title}] }` | Fires on every sort change (header click or programmatic `setSort`) **and once after build** for the initial/restored state. `sorters` is **primary-first** (Tabulator reports multi-column sort last-primary; the event reverses it) and carries each column's display `title`. `sorters` is `[]` when no sort is applied. Use it to render a "Sorted by …" label that survives reload + search. The live payload is also cached on the host as `_lastSorters` for consumers that wire up after the build-time emit. |
 
 ### Usage
 
@@ -126,6 +136,17 @@ A Datastar Rocket web component wrapping [Tabulator 6.3](https://tabulator.info/
   movable-columns="true"
   initial-sort='[{"column":"name","dir":"asc"}]'
 ></rocket-tabulator>
+
+<!-- Sort label: reflect the current sort, restored on reload + kept through search -->
+<div data-signals:sortLabel="''">
+  <span data-show="$sortLabel" data-text="'Sorted by ' + $sortLabel"></span>
+  <rocket-tabulator
+    columns='[{"title":"Name","field":"name"},{"title":"Date","field":"date"}]'
+    data='[{"name":"Alice","date":"2026-01-01"}]'
+    initial-sort='[{"column":"date","dir":"desc"}]'
+    data-on:tab-sorted="$sortLabel = evt.detail.sorters.map(function(s){return s.title + ' ' + s.dir}).join(', ')"
+  ></rocket-tabulator>
+</div>
 
 <!-- Row click -->
 <rocket-tabulator
@@ -180,6 +201,26 @@ When `selectable-rows="true"`:
 - A frozen checkbox column is prepended (header checkbox = select all)
 - Tabulator's `selectableRows` is enabled
 - `tab-rows-selected` fires on every select/deselect with `detail.rows` containing selected row data
+
+### Formatter & sorter tokens
+
+Column defs are JSON-serialized server-side, and `JSON.stringify` drops
+function-valued props — so a `formatter`/`sorter` **function** set on the server
+never reaches the client. Instead set a **string token** the component resolves
+to the real function at build time (in `resolveColumnHelpers`):
+
+| Token | Applies to | Behaviour |
+|---|---|---|
+| `mmddyyyy` | `sorter` | Chronological sort handling both `MM/DD/YYYY` (display) and `YYYY-MM-DD` (ISO) cell values. Blank/unparseable sort to the bottom. **Auto-applied** to any column with `headerFilter: "date"` or `formatter: "isoDate"` that didn't set a sorter. |
+| `signedMoney` | `formatter` | Renders negative (credit) amounts in red; positive/blank pass through. Pairs with a pre-formatted `"$-1,234.00"` cell value. |
+| `statusBadge` | `formatter` | Status pill — accepts the label (`Open`/`Closed`/`ReOpen`) **or** the raw code (`1`/`2`/`3`), emits a `.cdf-status` span (green open / red closed). _App-oriented._ |
+| `openClaimButton` | `formatter` | Renders a primary "Open" button calling `window.openClaimTab(id, claimNo, townId)`; reads `WCompID`/`LiabilityID` + `TownID` from the row. _App-oriented._ |
+| `accountScanLink` | `formatter` | Account cell as a link calling `window._loadScansFor(id, townId)` (`stopPropagation` so a row-click open still works). _App-oriented._ |
+| `checklistFilter` | `headerFilter` | Apply/Clear multi-select checklist filter. Resolved automatically for JSON columns; for post-construction grids use `host._checklistFilter` (see Props). |
+
+The `_App-oriented_` tokens encode brm-app navigation contracts
+(`window.openClaimTab` / `window._loadScansFor`); they're inert unless a column
+opts in by name, so they're harmless for generic grids.
 
 ### Notes
 
