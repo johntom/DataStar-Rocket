@@ -143,6 +143,40 @@ happens in the modal.
 
 ---
 
+## Pattern 3 — Persisted sort + "Sorted by …" label
+
+To show the current sort and have it **survive reload and re-search**:
+
+- Server sends the saved sort as `initial-sort='[{"column":"date","dir":"desc"}]'`.
+  The component **applies** it after build (rows actually reorder), even when the
+  grid builds empty and streams rows in via a later `data-attr:data` swap.
+- Listen for `tab-sorted` to render the label. The `detail.sorters` array is
+  **primary-first** and carries each column's `title`:
+
+```html
+<div data-signals:sortLabel="''">
+  <span class="grid-sort-label"
+        data-show="$sortLabel"
+        data-text="'Sorted by ' + $sortLabel"></span>
+
+  <rocket-tabulator
+    columns='{{ columnsJson | safe }}'
+    data='[]'
+    data-attr:data="$rows"
+    initial-sort='{{ sortersJson | safe }}'
+    data-on:tab-sorted="$sortLabel = evt.detail.sorters.map(function(s){return s.title + ' ' + s.dir}).join(', ')"
+  ></rocket-tabulator>
+</div>
+```
+
+- **Save it back** on unload by reading the live sort off the host
+  (`gridEl._lastSorters`) alongside your column-state payload.
+- **Multi-column note:** Tabulator reports/apply multi-sort with the *last*
+  entry as primary; `tab-sorted` already reverses this so `sorters[0]` is the
+  primary the user sees. Don't re-reverse it.
+
+---
+
 ## Gotchas
 
 - **`data-computed` is a no-op** in this Datastar Pro build — irrelevant to
