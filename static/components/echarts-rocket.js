@@ -1,4 +1,4 @@
-// Rocket ECharts component — Datastar Pro v1.0.1
+// Rocket ECharts component — Datastar Pro v1.0.1 bundle (OSS core 1.0.2)
 // Public contract preserved from the RC.7/8 template version:
 //   tag:    <rocket-echarts>
 //   props:  option, height, theme, resize-delay

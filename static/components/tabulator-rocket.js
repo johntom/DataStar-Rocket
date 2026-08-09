@@ -1,4 +1,4 @@
-// Rocket Tabulator component — Datastar Pro v1.0.1
+// Rocket Tabulator component — Datastar Pro v1.0.1 bundle (OSS core 1.0.2)
 // Public contract preserved from the RC.7/8 template version:
 //   tag:       <rocket-tabulator>
 //   props:     columns, data, height, layout, placeholder,
@@ -38,38 +38,18 @@ function isoDateFormatter(cell) {
 }
 
 function notesWrapFormatter(cell) {
+  // Multi-line preview cell (max ~3 lines, overflow hidden). The click-to-open
+  // full-note popup was removed — it stopPropagation'd the cell click, so
+  // clicking Notes opened a modal instead of selecting the diary row +
+  // populating the edit form (which already shows the full note). Clicking the
+  // cell now behaves like any other cell. The hover tooltip (notesWrapTooltip)
+  // still gives a quick preview.
   const v = cell.getValue() || ''
   const div = document.createElement('div')
   div.style.cssText =
     'white-space:pre-wrap;word-break:break-word;' +
-    'max-height:3.6em;overflow:hidden;line-height:1.2em;cursor:pointer;'
+    'max-height:3.6em;overflow:hidden;line-height:1.2em;'
   div.textContent = v
-  if (v.length > 120 || v.indexOf('\n') !== -1) {
-    div.title = 'Click to view full note'
-  }
-  div.addEventListener('click', (e) => {
-    e.stopPropagation()
-    if (!v) return
-    const old = document.getElementById('_notes-popup')
-    if (old) old.remove()
-    const overlay = document.createElement('div')
-    overlay.id = '_notes-popup'
-    overlay.style.cssText =
-      'position:fixed;inset:0;z-index:10000;' +
-      'background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;'
-    const box = document.createElement('div')
-    box.style.cssText =
-      'background:var(--clr-surface,#fff);color:var(--clr-text,#222);' +
-      'border:1px solid var(--clr-border,#ccc);border-radius:6px;padding:12px 16px;' +
-      'max-width:720px;max-height:70vh;overflow-y:auto;white-space:pre-wrap;' +
-      'word-break:break-word;font-size:13px;line-height:1.5;box-shadow:0 4px 24px rgba(0,0,0,.3);min-width:320px;'
-    box.textContent = v
-    overlay.appendChild(box)
-    overlay.addEventListener('click', (ev) => {
-      if (ev.target === overlay) overlay.remove()
-    })
-    document.body.appendChild(overlay)
-  })
   return div
 }
 
@@ -202,6 +182,12 @@ function makeChecklistFilter(registerCleanup) {
       dropdown.style.top = rect.bottom + 'px'
       dropdown.style.left = rect.left + 'px'
       dropdown.style.minWidth = Math.max(180, rect.width) + 'px'
+      // Size the option list to the space below the header instead of the old
+      // fixed 170px, so long value lists (e.g. every staff name) are visible
+      // without scrolling whenever the viewport allows.
+      const avail = window.innerHeight - rect.bottom - 8
+      dropdown.style.maxHeight = Math.max(260, avail) + 'px'
+      listWrap.style.maxHeight = Math.max(170, avail - 64) + 'px'
     }
 
     function buildList(filterText) {
@@ -416,6 +402,10 @@ rocket('rocket-tabulator', {
     resizableColumns: bool.default(true),
     enableRowClick: bool.default(false),
     selectableRows: bool.default(false),
+    // When selectableRows is on, this controls the leading row-selection
+    // checkbox column. Default true = existing behavior; set false (e.g. the
+    // diary grid) to keep the row-highlight selection WITHOUT the checkbox.
+    selectionCheckbox: bool.default(true),
     initialSort: string.default(''),
     initialFilters: string.default(''),
     rowIndex: string.default(''),
@@ -430,6 +420,10 @@ rocket('rocket-tabulator', {
     // Tabulator group toggle element: "" (default arrow), "header" (whole
     // group header click-toggles collapse), or "arrow".
     groupToggle: string.default(''),
+    // Open the grid grouped by this field (grid-reports pattern): group
+    // header shows "field : value (n items)". Runtime regrouping still works
+    // via _tabInstance.setGroupBy(). Empty = no grouping (default).
+    groupBy: string.default(''),
   }),
 
   render: ({ html }) => html`<div data-rocket-ref="tableEl" style="width:100%"></div>`,
@@ -471,18 +465,29 @@ rocket('rocket-tabulator', {
     if (sort.length) config.initialSort = sort.map((s) => ({ ...s }))
     if (props.columnCalcs) config.columnCalcs = props.columnCalcs
     if (props.groupToggle) config.groupToggleElement = props.groupToggle
+    if (props.groupBy) {
+      config.groupBy = props.groupBy
+      // Group values come from row data — escape them, groupHeader renders HTML.
+      const escGh = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      config.groupHeader = (value, count) =>
+        `${escGh(props.groupBy)} : ${escGh(value)} <span style="color:#16a34a">(${count} items)</span>`
+    }
 
     if (props.selectableRows) {
       config.selectableRows = 'highlight'
-      config.rowHeader = {
-        formatter: 'rowSelection',
-        titleFormatter: 'rowSelection',
-        headerSort: false,
-        resizable: false,
-        frozen: true,
-        headerHozAlign: 'center',
-        hozAlign: 'center',
-        width: 40,
+      // The checkbox column is opt-out (selection-checkbox="false") — highlight
+      // selection still works via row.select() without it.
+      if (props.selectionCheckbox) {
+        config.rowHeader = {
+          formatter: 'rowSelection',
+          titleFormatter: 'rowSelection',
+          headerSort: false,
+          resizable: false,
+          frozen: true,
+          headerHozAlign: 'center',
+          hozAlign: 'center',
+          width: 40,
+        }
       }
     }
 

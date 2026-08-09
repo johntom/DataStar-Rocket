@@ -1,9 +1,8 @@
-// Rocket Tom Select component — Datastar Pro v1.0.1
+// Rocket Tom Select component — Datastar Pro v1.0.1 bundle (OSS core 1.0.2)
 // Public contract preserved from the RC.7/8 template version:
 //   tag:    <rocket-tom-select>
 //   props:  placeholder, max-items, options, value, allow-create,
-//           detail-field, search-url, check-options, dropdown-parent,
-//           auto-select-single
+//           detail-field, search-url, check-options, dropdown-parent
 //   emits:  ts-change CustomEvent { detail: { value: string } }
 
 import { rocket } from '/static/datastar-pro.js'
@@ -44,21 +43,34 @@ rocket('rocket-tom-select', {
     value: string.default(''),
     allowCreate: bool.default(false),
     detailField: string.default(''),
+    // Opt-in: render this ONE detail field FIRST and bold (alongside the bold
+    // text label) instead of as a trailing muted detail. Used by the wcomp
+    // payee picker to lead each row with the bold FEDID before the payee name.
+    // Must also appear in detail-field. Empty = current behavior (text first,
+    // all detail fields trailing/muted) — so liability and other pickers are
+    // unaffected.
+    leadField: string.default(''),
     searchUrl: string.default(''),
     checkOptions: bool.default(false),
     dropdownParent: string.default(''),
-    // When the user's typing narrows the dropdown to a single remaining
-    // option, auto-select it. Two code paths: onType (local-option pickers,
-    // sync filter) and the post-load event (remote search-url pickers,
-    // async results).
+    // Space-separated class names to add to the tom-select dropdown
+    // element after init. The dropdown is appended to <body> (or to the
+    // dropdownParent if set), NOT inside the rocket-tom-select host — so
+    // host classes can't reach it via CSS descendant selectors. This prop
+    // lets a consumer scope dropdown styling (e.g. dropdown-class="driver-picker-dropdown"
+    // + CSS .driver-picker-dropdown { min-width: 720px }) without changing
+    // the dropdown's parent.
+    dropdownClass: string.default(''),
+    // When true, as soon as the user's typing narrows the dropdown to a
+    // single remaining option, that option is auto-selected. Two code
+    // paths are wired: onType (local-option pickers, sync filter) and the
+    // post-load event (remote search-url pickers, async results).
     // Single-select picker: setValue + close + blur.
     // Multi / check-options picker: addItem + clear typed text so the user
     //   can keep filtering for more matches.
-    // Default: ON for single-select (max-items=1, no check-options); OFF
-    // for multi / check-options (would hijack the typed text mid-filter).
-    // Override either way with auto-select-single="true" / "false". The
-    // attribute is re-read live on every keystroke / load, so it can be
-    // toggled at runtime (e.g. via data-attr in Datastar).
+    // Used by the liability/wcomp search panels (5 multi-select pickers)
+    // and the detail header (Source of Inj / Injury Type / Occurrence /
+    // Affected Part / Dept / Driver).
     autoSelectSingle: bool.default(false),
   }),
 
@@ -69,24 +81,14 @@ rocket('rocket-tom-select', {
     let prevOptionsStr = ''
     let lastSyncedValue = ''
 
-    // Shared auto-select-single resolver. Called from config.onType
-    // (local-option pickers, sync filter) AND from a post-init 'load'
-    // listener (remote search-url pickers, async results). Both call sites
-    // are always wired; _autoSelectActive() is the per-call gate.
+    // Shared auto-select-single resolver. Called from config.onType (set in
+    // buildConfig when autoSelectSingle is on) AND from a post-init 'load'
+    // listener (wired below after the instance exists, also when autoSelectSingle
+    // is on). One implementation, two call sites — covers both local-option
+    // and remote search-url pickers.
     const isMulti = !!props.checkOptions || (props.maxItems || 1) > 1
-    // Live check — re-read the raw attribute on every call so callers can
-    // toggle auto-select-single at runtime (e.g. data-attr:auto-select-single
-    // in the demo). bool.default(false) collapses "unset" and explicit
-    // "false", so we read the raw attribute: unset → ON for single-select
-    // / OFF for multi; explicit "false"/"0" → off; anything else → on.
-    function _autoSelectActive() {
-      const raw = host.getAttribute('auto-select-single')
-      if (raw === null) return !isMulti
-      return raw !== 'false' && raw !== '0'
-    }
     function _tryAutoSelectSingle(ts) {
       if (!ts) return
-      if (!_autoSelectActive()) return
       const items = ts.currentResults && ts.currentResults.items
       if (!items || items.length !== 1) return
       const only = items[0].id
@@ -143,23 +145,24 @@ rocket('rocket-tom-select', {
         config.plugins.remove_button = { title: 'Remove' }
       }
 
-      // Auto-resolve when typing narrows the dropdown to a single option.
-      // Always wired; the per-call _autoSelectActive() gate decides whether
-      // to actually fire (supports runtime toggling of the attribute).
-      // Two call sites:
-      //   • onType  → local-option pickers (TomSelect filters currentResults
-      //     synchronously, so setTimeout(0) lets that pass finish before we
-      //     inspect items).
-      //   • 'load' event (wired post-init below) → remote search-url pickers
-      //     (results arrive AFTER the keystroke; onType already ran and saw 0).
-      // Single-select  → setValue + close + blur.
-      // Multi / check-options → addItem and clear the typed text so the user
-      //   can keep filtering for more matches (the check-options Apply /
-      //   dropdown_close auto-apply still gate the actual search).
-      config.onType = function (query) {
-        if (!query) return
-        var self = this
-        setTimeout(function () { _tryAutoSelectSingle(self) }, 0)
+      if (props.autoSelectSingle) {
+        // Auto-resolve when typing narrows the dropdown to a single option.
+        // Fired from two places (both wired up post-init in onFirstRender):
+        //   • onType  → covers local-option pickers (TomSelect filters
+        //     currentResults synchronously, so setTimeout(0) lets that pass
+        //     finish before we inspect items).
+        //   • 'load' event → covers remote search-url pickers (results
+        //     arrive AFTER the keystroke; onType already ran and saw 0).
+        // currentResults.items[i].id is the option's value (per valueField).
+        // Single-select  → setValue + close + blur.
+        // Multi / check-options → addItem and clear the typed text so the
+        //   user can keep filtering for more matches (the check-options
+        //   Apply / dropdown_close auto-apply still gate the actual search).
+        config.onType = function (query) {
+          if (!query) return
+          var self = this
+          setTimeout(function () { _tryAutoSelectSingle(self) }, 0)
+        }
       }
 
       if (opts.length > 0) {
@@ -172,19 +175,29 @@ rocket('rocket-tom-select', {
       if (props.detailField) {
         const fields = props.detailField.split(',').map((f) => f.trim())
         config.searchField = ['text'].concat(fields)
+        // Optional lead field: rendered first + bold (with a bold text label),
+        // and pulled out of the trailing muted details.
+        const lead = props.leadField || ''
+        const detailFields = lead ? fields.filter((f) => f !== lead) : fields
         config.render = {
           option(data, escape) {
             let h = '<div style="display:flex;gap:.5rem">'
-              + '<span style="flex:1">' + escape(data.text) + '</span>'
-            for (const f of fields) {
+            if (lead) {
+              h += '<span style="font-weight:700;min-width:6rem">' + escape(data[lead] || '') + '</span>'
+            }
+            h += '<span style="flex:1' + (lead ? ';font-weight:700' : '') + '">'
+              + escape(data.text) + '</span>'
+            for (const f of detailFields) {
               h += '<span style="color:#888;font-size:.8em;min-width:5rem;text-align:right">'
                 + escape(data[f] || '') + '</span>'
             }
             return h + '</div>'
           },
           item(data, escape) {
-            const parts = [escape(data.text)]
-            for (const f of fields) if (data[f]) parts.push(escape(data[f]))
+            const parts = []
+            if (lead && data[lead]) parts.push(escape(data[lead]))
+            parts.push(escape(data.text))
+            for (const f of detailFields) if (data[f]) parts.push(escape(data[f]))
             return '<div>' + parts.join(' · ') + '</div>'
           },
         }
@@ -201,7 +214,15 @@ rocket('rocket-tom-select', {
         }
         config.labelField = 'text'
         config.valueField = 'value'
-        config.searchField = ['text']
+        // DON'T blindly overwrite searchField here — if `detail-field` was
+        // also set, that block above expanded searchField to include the
+        // detail columns (license/dob/state/...) so a typed query could
+        // match any of them. Overwriting back to ['text'] meant a query
+        // like "ABC123" (a license number) would never match because the
+        // server returned rows whose `text` column ("Last, First") didn't
+        // contain "ABC123" — bug #9 (driver search shows 2 records but
+        // dropdown is empty). Only set ['text'] when detail-field didn't.
+        if (!props.detailField) config.searchField = ['text']
       }
 
       return config
@@ -243,10 +264,20 @@ rocket('rocket-tom-select', {
       })
       // Auto-apply on dropdown close (click-away / Escape / done selecting)
       // when the value changed since the last apply — so picking a filter
-      // refreshes without hunting for the Apply button. Explicit Apply/Clear
-      // still work; no-ops when the value is unchanged.
+      // (e.g. All Insureds → one town) refreshes without hunting for the
+      // Apply button. Explicit Apply/Clear still work; no-ops when unchanged.
       ts.on('dropdown_close', () => {
         if (norm(ts.getValue()) !== lastApplied) apply(ts.getValue())
+      })
+      // Removing a chip via its ✕ (remove_button) happens with the dropdown
+      // closed, so neither Apply nor dropdown_close fires — and check-options
+      // gates the normal onChange. Clearing the last selected option that way
+      // (e.g. an Insured restored from a saved search) therefore never emitted
+      // ts-change and the grid never refreshed. Apply on item removal when the
+      // dropdown is closed; the open-dropdown uncheck is still handled by
+      // dropdown_close above, so this won't double-fire.
+      ts.on('item_remove', () => {
+        if (!ts.isOpen && norm(ts.getValue()) !== lastApplied) apply(ts.getValue())
       })
       bar.appendChild(applyBtn)
       bar.appendChild(clearBtn)
@@ -265,43 +296,111 @@ rocket('rocket-tom-select', {
         tsInstance = new TomSelect(refs.selectEl, buildConfig(TomSelect))
         prevOptionsStr = props.options || ''
         lastSyncedValue = props.value || ''
+        // Re-apply the server-provided initial value after construction.
+        // onInitialize() already calls setValue during construction, but for
+        // check-options pickers the control is wired by the checkbox_options /
+        // remove_button plugins, and that initial setValue can leave the
+        // control showing the placeholder while a value is actually set — a
+        // restored Insured / Claim Type then reads as "All …" instead of its
+        // chip. setValue is silent (no ts-change) and idempotent, so this is
+        // purely visual; it runs before attachCheckboxBar() so the auto-apply
+        // baseline (lastApplied) captures the correct value.
+        if (props.value) tsInstance.setValue(props.value.split(','), true)
+        // Propagate dropdown-class onto the actual dropdown element. The
+        // dropdown is appended to <body> by default, so this is the only
+        // way for a consumer to scope CSS to a specific picker's dropdown
+        // without setting dropdown-parent.
+        if (props.dropdownClass && tsInstance.dropdown) {
+          props.dropdownClass.split(/\s+/).filter(Boolean).forEach(function (c) {
+            tsInstance.dropdown.classList.add(c)
+          })
+        }
         attachCheckboxBar()
+
+        // ── Ctrl/Cmd+C copies the selected option's label ──────────────────
+        // TomSelect renders the chosen item as a non-selectable <div>, so a
+        // plain Ctrl+C copies nothing. Wire a copy handler on the control:
+        // with a value selected and no live text selection (so we never
+        // hijack copying typed search text), write the option label(s) to the
+        // clipboard. Multi-select joins labels with ", ". Listener lives on
+        // the TomSelect wrapper, which is removed by destroy() — no leak.
+        function _copySelectedLabel(e) {
+          // Respect a real text selection (e.g. user highlighted typed text).
+          var docSel = window.getSelection && window.getSelection()
+          if (docSel && String(docSel).length > 0) return
+          var val = tsInstance.getValue()
+          var vals = Array.isArray(val) ? val : (val ? [val] : [])
+          if (!vals.length) return
+          var labelField = tsInstance.settings.labelField || 'text'
+          var text = vals.map(function (v) {
+            var o = tsInstance.options[v]
+            return o ? (o[labelField] || o.text || v) : v
+          }).join(', ')
+          if (!text) return
+          e.preventDefault()
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).catch(function () { _fallbackCopy(text) })
+            } else {
+              _fallbackCopy(text)
+            }
+          } catch (_) { _fallbackCopy(text) }
+        }
+        function _fallbackCopy(text) {
+          try {
+            var ta = document.createElement('textarea')
+            ta.value = text
+            ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0'
+            document.body.appendChild(ta)
+            ta.select()
+            document.execCommand('copy')
+            document.body.removeChild(ta)
+          } catch (_) { /* clipboard unavailable — nothing more we can do */ }
+        }
+        if (tsInstance.wrapper) {
+          // Capture phase so we handle Ctrl/Cmd+C before TomSelect's own
+          // control_input key handling gets a chance to swallow it.
+          tsInstance.wrapper.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+              _copySelectedLabel(e)
+            }
+          }, true)
+        }
+
         // Remote-picker auto-select: re-evaluate after each async load
         // completes (onType already ran before fetch returned and saw 0).
-        // The helper short-circuits if auto-select is currently inactive.
-        if (props.searchUrl) {
+        if (props.autoSelectSingle && props.searchUrl) {
           tsInstance.on('load', function () {
             _tryAutoSelectSingle(tsInstance)
           })
         }
         // Custom dropdown-parent positioning fix.
-        //   TomSelect's internal positionDropdown() only runs when
-        //   dropdownParent is 'body' (the default). When you set
-        //   dropdownParent to a custom element — required for pickers
-        //   inside a native <dialog> opened with showModal() so the
-        //   dropdown participates in the top-layer — positionDropdown
-        //   bails. The dropdown's CSS then uses its default `top: 100%`
-        //   rule, which means 100% of the PARENT's height — so the
-        //   dropdown ends up at the bottom of the custom parent (often
-        //   off-screen ~y=900px in a tall dialog), not below the input.
+        //   TomSelect's positionDropdown() only runs when dropdownParent
+        //   is 'body' (the default). When you set dropdownParent to a
+        //   custom element (e.g. for a picker inside a <dialog> opened
+        //   with showModal(), where body-children are occluded by the
+        //   top-layer), positionDropdown bails. The dropdown's CSS then
+        //   uses its default `top: 100%` rule, which means 100% of the
+        //   PARENT's height — so the dropdown ends up at the bottom of
+        //   the dialog (often off-screen ~y=900px), not below the input.
         //
         //   Fix: on every dropdown_open, manually anchor the dropdown to
-        //   the .ts-control (the input wrapper) using offsets computed
-        //   relative to the dropdown's parent. This mirrors what
-        //   TomSelect's own positionDropdown does for the body parent.
+        //   the .ts-control element (the input wrapper) using offsets
+        //   computed relative to the dropdown's parent. This mirrors
+        //   what positionDropdown() does for the default body parent.
         if (props.dropdownParent) {
           tsInstance.on('dropdown_open', function () {
             try {
-              const ctrl = tsInstance.control
-              const dd   = tsInstance.dropdown
-              const pe   = dd.parentElement
+              var ctrl = tsInstance.control
+              var dd   = tsInstance.dropdown
+              var pe   = dd.parentElement
               if (!ctrl || !dd || !pe) return
-              const cRect = ctrl.getBoundingClientRect()
-              const pRect = pe.getBoundingClientRect()
+              var cRect = ctrl.getBoundingClientRect()
+              var pRect = pe.getBoundingClientRect()
               dd.style.top   = (cRect.bottom - pRect.top)  + 'px'
               dd.style.left  = (cRect.left   - pRect.left) + 'px'
               dd.style.width = cRect.width + 'px'
-            } catch (e) { /* non-fatal: dropdown still renders */ }
+            } catch (e) { /* non-fatal: dropdown still renders, just maybe mispositioned */ }
           })
         }
       })

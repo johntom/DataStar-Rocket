@@ -1,15 +1,16 @@
-# 🚀Rocket Tom Select with datastar 1.0.1    
+# 🚀Rocket Tom Select with Datastar (Pro v1.0.1 bundle, OSS core spec 1.0.2)
   
 A Datastar **Rocket** version 1 web component wrapping [Tom Select](https://tom-select.js.org/).
 Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) License.
 
+## https://github.com/johntom/DataStar-Rocket
 ## Version
 
 | Field          | Value        |
 | -------------- | ------------ |
-| `VERSION`      | `2.0.8` |
-| `VERSION_date` | `06/12/26` |
-| `VERSION_mess` | `tabulator-rocket: tab-sorted event + sort restore, filter-bar, lock-column-order, column-calcs/group-toggle, formatter/sorter tokens; docs updated` |
+| `VERSION`      | `2.0.9` |
+| `VERSION_date` | `08/09/26` |
+| `VERSION_mess` | `Datastar 1.0.2 upgrade: SDK @johntom/datastar-fastify 1.0.2 (viewTransitionSelector); components synced from brm_FlowDS (notes-preview fix, selectionCheckbox, groupBy, tom-select auto-select-single/lead-field/bug#9); Pro bundle stays v1.0.1` |
 
 <!--Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)-->
 
@@ -39,7 +40,9 @@ npm run start
 | `search-url` | string | `""` | Backend URL for remote search (`?q=` → JSON `[{value,text}]`) |
 | `check-options` | boolean | `false` | Checkbox multi-select with Apply/Clear buttons |
 | `dropdown-parent` | string | `""` | Selector for the element the dropdown is rendered into (e.g. `"body"`) |
-| `auto-select-single` | boolean | mode-dependent | When typing narrows the dropdown to a single match, auto-resolve it (single-select: `setValue` + close; multi: `addItem` + clear textbox so the user can keep filtering). **Defaults ON for single-select** (`max-items=1`, no `check-options`); **OFF for multi / check-options**. Override either way with `auto-select-single="true"` / `"false"`. Re-read live, so it can be toggled at runtime via `setAttribute`. |
+| `auto-select-single` | boolean | `false` | Opt-in. When typing narrows the dropdown to a single match, auto-resolve it (single-select: `setValue` + close + blur; multi/check-options: `addItem` + clear textbox so the user can keep filtering). Covers both local-option pickers (`onType`) and remote `search-url` pickers (post-`load`). |
+| `lead-field` | string | `""` | Render this ONE detail field first and bold (with a bold text label) instead of as a trailing muted detail. Must also appear in `detail-field`. Empty = current behavior. |
+| `dropdown-class` | string | `""` | Space-separated class names added to the dropdown element after init — lets you scope dropdown CSS even though the dropdown is appended to `body`/`dropdown-parent`, outside the host. |
 
 ### Events
 
@@ -155,6 +158,10 @@ A Datastar **Rocket** v1.0.1 JS-API web component wrapping [Tabulator 6.3](https
 | `initial-sort` | string (JSON) | `""` | Sort config `[{column, dir}]` |
 | `initial-filters` | string (JSON) | `""` | Server-saved header filters `[{field, value}]`, applied once the table is built |
 | `row-index` | string | `""` | Field name to use as the Tabulator row index |
+| `filter-bar` | boolean | `false` | Opt-in blue active-filter status footer (legacy-Delphi style); see `tabulator-rocket.md` |
+| `lock-column-order` | boolean | `false` | Column picker is hide/show only — no drag-to-reorder grip |
+| `selection-checkbox` | boolean | `true` | With `selectable-rows`: controls the leading checkbox column. Set `false` to keep row-highlight selection without the checkbox (e.g. a diary grid) |
+| `group-by` | string | `""` | Open the grid grouped by this field; group header shows `field : value (n items)`. Runtime regrouping via `_tabInstance.setGroupBy()` |
 
 ### Events
 
@@ -163,6 +170,7 @@ A Datastar **Rocket** v1.0.1 JS-API web component wrapping [Tabulator 6.3](https
 | `tab-row-click` | `{ row }` | Fired on row click (when `enable-row-click` is true) |
 | `tab-rows-selected` | `{ rows }` | Fired on selection change (when `selectable-rows` is true) |
 | `tab-columns-changed` | `{ columns }` | Debounced 600ms on column move/resize/visibility change |
+| `tab-sorted` | `{ sorters }` | On every sort change + once after build; `sorters` is `[{field, dir, title}]`, `[]` when unsorted (see `tabulator-rocket.md`) |
 
 ### Usage Examples
 
