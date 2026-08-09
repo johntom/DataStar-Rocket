@@ -1,7 +1,7 @@
 @echo off
 setlocal
 echo Git: update main
-echo ==================
+echo ==================tom-select
 echo see https://github.com/johntom/DataStar-Rocket
 echo.
 pause

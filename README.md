@@ -8,9 +8,9 @@ Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) Licen
 
 | Field          | Value        |
 | -------------- | ------------ |
-| `VERSION`      | `2.0.9` |
+| `VERSION`      | `2.0.10` |
 | `VERSION_date` | `08/09/26` |
-| `VERSION_mess` | `Datastar 1.0.2 upgrade: SDK @johntom/datastar-fastify 1.0.2 (viewTransitionSelector); components synced from brm_FlowDS (notes-preview fix, selectionCheckbox, groupBy, tom-select auto-select-single/lead-field/bug#9); Pro bundle stays v1.0.1` |
+| `VERSION_mess` | `tom-select: restore auto-select-single live gate (mode-dependent default, runtime toggle via setAttribute); keeps brm two-path resolver` |
 
 <!--Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)-->
 
@@ -40,7 +40,7 @@ npm run start
 | `search-url` | string | `""` | Backend URL for remote search (`?q=` → JSON `[{value,text}]`) |
 | `check-options` | boolean | `false` | Checkbox multi-select with Apply/Clear buttons |
 | `dropdown-parent` | string | `""` | Selector for the element the dropdown is rendered into (e.g. `"body"`) |
-| `auto-select-single` | boolean | `false` | Opt-in. When typing narrows the dropdown to a single match, auto-resolve it (single-select: `setValue` + close + blur; multi/check-options: `addItem` + clear textbox so the user can keep filtering). Covers both local-option pickers (`onType`) and remote `search-url` pickers (post-`load`). |
+| `auto-select-single` | boolean | mode-dependent | When typing narrows the dropdown to a single match, auto-resolve it (single-select: `setValue` + close + blur; multi/check-options: `addItem` + clear textbox so the user can keep filtering). Covers local-option pickers (`onType`) and remote `search-url` pickers (post-`load`). **Defaults ON for single-select, OFF for multi/check-options**; explicit `"false"`/`"0"` disables. The raw attribute is re-read on every keystroke, so it can be toggled at runtime via `setAttribute` / `data-attr:auto-select-single`. |
 | `lead-field` | string | `""` | Render this ONE detail field first and bold (with a bold text label) instead of as a trailing muted detail. Must also appear in `detail-field`. Empty = current behavior. |
 | `dropdown-class` | string | `""` | Space-separated class names added to the dropdown element after init — lets you scope dropdown CSS even though the dropdown is appended to `body`/`dropdown-parent`, outside the host. |
 
