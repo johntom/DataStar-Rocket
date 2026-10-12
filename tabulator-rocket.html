@@ -2,9 +2,9 @@
 <!--
   Rocket Tabulator — standalone demo page
   =======================================
-  Datastar Pro v1.0.1 JS-API component (static/components/tabulator-rocket.js).
+  Datastar 1.0.4 Rocket (beta.2) JS-API component (static/components/tabulator-rocket.js).
   Unlike the old RC.7 <template data-rocket:> (which used data-import: to fetch
-  Tabulator), the v1.0.1 module expects window.Tabulator to be preloaded — so
+  Tabulator), the 1.0 JS-API module expects window.Tabulator to be preloaded — so
   this page includes the Tabulator JS <script> below. Public element contract
   is unchanged: <rocket-tabulator> props columns / data / height / layout /
   movable-columns / resizable-columns / enable-row-click / selectable-rows /
@@ -16,14 +16,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rocket + Tabulator — Datastar Pro v1.0.1</title>
+  <title>Rocket + Tabulator — Datastar 1.0.4 / Rocket beta.2</title>
 
-  <!-- Tabulator CSS + JS (v1.0.1 component needs window.Tabulator preloaded) -->
+  <!-- Tabulator CSS + JS (the Rocket component needs window.Tabulator preloaded) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/css/tabulator_modern.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.0/dist/js/tabulator.min.js"></script>
 
-  <!-- Datastar Pro v1.0.1 + Inspector + the Rocket component module -->
-  <script type="module" src="/static/datastar-pro.js"></script>
+  <!-- Datastar v1.0.4 + Rocket beta.2 (free MIT bundle, replaces datastar.js) + Inspector (Pro, optional) + the Rocket component module -->
+  <script type="module" src="/static/datastar-rocket.js"></script>
   <script type="module" src="/static/datastar-inspector.js"></script>
   <script type="module" src="/static/components/tabulator-rocket.js"></script>
 
@@ -64,7 +64,7 @@
 </head>
 <body>
   <h1>Rocket + Tabulator</h1>
-  <p class="subtitle">Datastar Rocket web component wrapping Tabulator 6.3 (Pro v1.0.1 JS-API)</p>
+  <p class="subtitle">Datastar Rocket web component wrapping Tabulator 6.3 (Rocket beta.2 JS-API — free since Datastar 1.0.4)</p>
   <p class="nav"><a href="/">← Index</a> &nbsp;·&nbsp; <a href="/tom-select">Tom Select demo →</a></p>
 
   <!-- Sample data, defined once; subsets derived for the dynamic-swap example -->

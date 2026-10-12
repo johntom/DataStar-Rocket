@@ -232,34 +232,48 @@ opts in by name, so they're harmless for generic grids.
 
 ---
 
-## Datastar RC.8 Compliance Notes
+## Datastar 1.0.4 Compliance Notes
 
-- All attributes use RC.6+ colon syntax: `data-on:click`, `data-signals:name`
+- All attributes use the colon syntax: `data-on:click`, `data-signals:name`
 - Signals referenced with `$` prefix, actions with `@` prefix
-- Backend uses `@post()` for mutations, `@get()` for reads
-- SDK uses `reply.datastar()` + `sse.patchElements()` / `sse.patchSignals()`
-- No use of removed RC.8 watchers (`RemoveFragments`, `RemoveSignals`, `ExecuteScript`)
-- Rocket props use RC.8 function-call syntax: `int(min(1))`, `str='default'`, `bool`
+- Backend uses `@post()` for mutations, `@get()` — or `@query()` (1.0.4, signals in the request body) — for reads
+- SDK uses `reply.datastar()` + `sse.patchElements()` / `sse.patchSignals()`; inbound signals come from `request.readSignals()` (the RC-era `datastar-signals` request header no longer exists)
+- No use of removed watchers (`RemoveFragments`, `RemoveSignals`, `ExecuteScript`) — only `datastar-patch-elements` / `datastar-patch-signals`
+- Rocket is the 1.0 JavaScript API (`rocket('tag', { props, render, onFirstRender })`), shipped in the free `datastar-rocket.js` bundle since 1.0.4 (Rocket beta.2); the RC.8 `<template data-rocket:>` syntax is gone
 
-## Rocket RC.8 Prop Syntax Quick Reference
+## Rocket 1.0 Prop Codec Quick Reference
 
-| Type | Syntax | Implicit Default |
-|---|---|---|
-| String | `str` or `str='fallback'` | `''` |
-| Integer | `int` or `int(min(0))` | `0` |
-| Number | `num` or `num(clamp(0,1))` | `0` |
-| Boolean | `bool` or `bool=true` | `false` |
-| JSON | `json` | `null` |
+Props are declared in `props: (codecs) => ({ ... })`; attribute names are kebab-case (`maxItems` → `max-items`). Invalid input falls back to the codec default.
+
+| Codec | Decoded type | Zero value | Chainable |
+|---|---|---|---|
+| `string` | string | `''` | `.trim` `.upper` `.lower` `.kebab` `.camel` `.snake` `.pascal` `.title` `.prefix(s)` `.suffix(s)` `.maxLength(n)` `.default(v)` |
+| `number` | number | `0` | `.min(n)` `.max(n)` `.clamp(a,b)` `.step(s, base?)` `.round` `.ceil(d?)` `.floor(d?)` `.fit(...)` `.default(v)` |
+| `bool` | boolean | `false` | `.default(v)` — `""`, `"true"`, `"1"` are truthy |
+| `date` | Date | now | `.default(() => new Date())` |
+| `json` | any | `{}` | `.default(v)` (strict JSON) |
+| `js` | any | `{}` | `.default(v)` — JS-like object literals, revives function strings (used by `<rocket-echarts option>`) |
+| `bin` | Uint8Array | empty | base64 in/out |
+| `array(codec)` / `array(a, b, …)` | T[] / tuple | `[]` | `.default(v)` |
+| `object(shape)` | typed object | per-field defaults | `.default(v)` |
+| `oneOf(...)` | union | first entry | `.default(v)` |
+
+Custom codecs: `createCodec({ decode, encode })`, exported from the bundle next to `rocket`.
 
 ## File Structure
 
 ```
-DS-TS-Webcompfiles/
+DataStar-Rocket/
   server.js                 -- Fastify server with sample data + SSE endpoints
-  tom-select-rocket.html    -- Standalone Tom Select component definition
-  tabulator-rocket.html     -- Standalone Tabulator component definition
+  tom-select-rocket.html    -- Standalone Tom Select demo page
+  tabulator-rocket.html     -- Standalone Tabulator demo page
   rocket.md                 -- This file
   static/
-    datastar-pro.js         -- Datastar Pro + Rocket bundle (RC.8)
-    datastar-inspector.js   -- Datastar inspector element
+    datastar-rocket.js      -- Datastar v1.0.4 + Rocket beta.2 (free MIT bundle, committed)
+    datastar-pro.js         -- optional Datastar Pro bundle (licensed, git-ignored; the Pro v1.0.4 build also includes Rocket)
+    datastar-inspector.js   -- Datastar Inspector dev tool (Pro, git-ignored, optional)
+    components/
+      tom-select-rocket.js  -- <rocket-tom-select>
+      tabulator-rocket.js   -- <rocket-tabulator>
+      echarts-rocket.js     -- <rocket-echarts>
 ```

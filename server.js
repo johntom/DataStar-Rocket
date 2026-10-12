@@ -11,6 +11,8 @@ await app.register(fastifyStatic, {
   prefix: "/static/",
 });
 
+// Datastar 1.0.4: the pages load the free static/datastar-rocket.js bundle (Rocket
+// left Pro in 1.0.4; a Pro v1.0.4 datastar-pro.js also includes Rocket).
 // Datastar Pro v1.0.1 migration:
 // The two demo pages are now self-contained standalone HTML files that load
 // the Rocket components as ES modules from /static/components/*.js (no more
@@ -46,7 +48,7 @@ app.get("/", async (request, reply) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Datastar Rocket Components — Pro v1.0.1</title>
+  <title>Datastar Rocket Components — Datastar 1.0.4 / Rocket beta.2</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px;
       margin: 3rem auto; padding: 0 1rem; color: #1a1a2e; background: #f8f9fa; }
@@ -62,7 +64,7 @@ app.get("/", async (request, reply) => {
 </head>
 <body>
   <h1>Datastar Rocket Components</h1>
-  <p class="subtitle">Pro v1.0.1 JS-API components — standalone demos</p>
+  <p class="subtitle">Rocket beta.2 JS-API components (free since Datastar 1.0.4) — standalone demos</p>
   <a class="tile" href="/tom-select">
     <h2>Tom Select →</h2>
     <p>Single / multi select, remote search, creatable tags with backend sync.</p>
@@ -88,7 +90,10 @@ app.get("/tabulator", async (request, reply) => {
 
 // ─── Tag Save Endpoint (SSE) ───────────────────────────────────
 app.post("/api/save-tags", async (request, reply) => {
-  const signals = JSON.parse(request.headers["datastar-signals"] || "{}");
+  // 1.0: POST signals arrive in the JSON body (readSignals); the RC-era
+  // "datastar-signals" request header no longer exists, so the old line below
+  // always saw {} and reported "Saved 0 tag(s)".
+  const { signals = {} } = await request.readSignals();
   reply.datastar((sse) => {
     const tagList = (signals.tags || "").split(",").filter(Boolean);
     sse.patchElements(

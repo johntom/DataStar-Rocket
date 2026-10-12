@@ -1,16 +1,16 @@
-# 🚀Rocket Tom Select with Datastar (Pro v1.0.1 bundle, OSS core spec 1.0.2)
+# 🚀Rocket Tom Select with Datastar (Datastar v1.0.4 + Rocket beta.2 — free bundle)
   
 A Datastar **Rocket** version 1 web component wrapping [Tom Select](https://tom-select.js.org/).
-Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) License.
+Rocket left Datastar Pro in **v1.0.4** and ships as a free MIT bundle (`static/datastar-rocket.js`, committed here). No [Datastar Pro](https://data-star.dev/pro) license is needed for these components any more; the optional `static/datastar-inspector.js` dev tool is still Pro.
 
 ## https://github.com/johntom/DataStar-Rocket
 ## Version
 
 | Field          | Value        |
 | -------------- | ------------ |
-| `VERSION`      | `2.0.10` |
-| `VERSION_date` | `08/09/26` |
-| `VERSION_mess` | `tom-select: restore auto-select-single live gate (mode-dependent default, runtime toggle via setAttribute); keeps brm two-path resolver` |
+| `VERSION`      | `2.0.11` |
+| `VERSION_date` | `10/12/26` |
+| `VERSION_mess` | `Datastar 1.0.4: Rocket is free — demos + components load static/datastar-rocket.js (committed, MIT) instead of the Pro bundle; /api/save-tags reads signals via readSignals (RC-era datastar-signals header fixed)` |
 
 <!--Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)-->
 
@@ -18,7 +18,7 @@ Both rockets requires a [Datastar Pro](https://data-star.dev/datastar_pro) Licen
 
 ```bash
 npm install
- copy your datastar-pro.js file to \static 
+# static/datastar-rocket.js (Datastar v1.0.4 + Rocket beta.2, MIT) is committed — nothing to copy
 npm run dev 
 or
 npm run start
@@ -107,10 +107,10 @@ When `check-options` is set, the dropdown shows checkboxes next to each option w
 
 ## How It Works
 
-This is a **Datastar Pro v1.0.1 JS-API component**, not an RC-era `<template data-rocket:>`. It is implemented in `static/components/tom-select-rocket.js` and registered with:
+This is a **Datastar 1.0 Rocket JS-API component** (Rocket beta.2, free since Datastar 1.0.4), not an RC-era `<template data-rocket:>`. It is implemented in `static/components/tom-select-rocket.js` and registered with:
 
 ```js
-import { rocket } from '/static/datastar-pro.js'
+import { rocket } from '/static/datastar-rocket.js'   // or your Pro v1.0.4 datastar-pro.js, which also includes Rocket
 rocket('rocket-tom-select', { mode: 'light', renderOnPropChange: false, props, render, onFirstRender })
 ```
 
@@ -138,9 +138,9 @@ The component self-loads the Tom Select **JS** from the CDN, so only the **CSS**
 
 ---
 
-## Rocket Tabulator Component v1.0.1
+## Rocket Tabulator Component (Rocket 1.0 JS-API)
 
-A Datastar **Rocket** v1.0.1 JS-API web component wrapping [Tabulator 6.3](https://tabulator.info/). Implemented in `static/components/tabulator-rocket.js`; demo page is `tabulator-rocket.html`. Unlike the Tom Select component, this one expects `window.Tabulator` to be **preloaded** — include the Tabulator JS `<script>` in the page.
+A Datastar **Rocket** 1.0 JS-API web component wrapping [Tabulator 6.3](https://tabulator.info/). Implemented in `static/components/tabulator-rocket.js`; demo page is `tabulator-rocket.html`. Unlike the Tom Select component, this one expects `window.Tabulator` to be **preloaded** — include the Tabulator JS `<script>` in the page.
 
 ### `<rocket-tabulator>`
 
