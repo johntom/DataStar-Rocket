@@ -8,9 +8,9 @@ Rocket left Datastar Pro in **v1.0.4** and ships as a free MIT bundle (`static/d
 
 | Field          | Value        |
 | -------------- | ------------ |
-| `VERSION`      | `2.0.11` |
-| `VERSION_date` | `10/12/26` |
-| `VERSION_mess` | `Datastar 1.0.4: Rocket is free — demos + components load static/datastar-rocket.js (committed, MIT) instead of the Pro bundle; /api/save-tags reads signals via readSignals (RC-era datastar-signals header fixed)` |
+| `VERSION`      | `2.0.12` |
+| `VERSION_date` | `10/21/26` |
+| `VERSION_mess` | `tabulator-rocket: Ctrl/Shift+click multi-column sort in click order (Tabulator made the last-clicked column primary) + 1/2/3 rank numbers next to the sort arrows; canonical-component sync (scripts/sync-components.mjs, 10 app copies) + the brm_FlowDS features documented (row helpers _setRows / _rkSetRows, column-calcs, group-toggle, movable-rows, app: formatter registry)` |
 
 <!--Live Demo: [demo on render](https://datastar-fastify-example-book.onrender.com/)-->
 
@@ -140,7 +140,7 @@ The component self-loads the Tom Select **JS** from the CDN, so only the **CSS**
 
 ## Rocket Tabulator Component (Rocket 1.0 JS-API)
 
-A Datastar **Rocket** 1.0 JS-API web component wrapping [Tabulator 6.3](https://tabulator.info/). Implemented in `static/components/tabulator-rocket.js`; demo page is `tabulator-rocket.html`. Unlike the Tom Select component, this one expects `window.Tabulator` to be **preloaded** — include the Tabulator JS `<script>` in the page.
+A Datastar **Rocket** 1.0 JS-API web component wrapping [Tabulator 6.3](https://tabulator.info/). Implemented in `static/components/tabulator-rocket.js`; demo page is `tabulator-rocket.html`. **That file is the source of truth for every app's copy** — edit it here, then `node scripts/sync-components.mjs --check` / `--write` copies it to the ten apps that carry one, keeping each app's own `import` line (see `rocket.md` → "Source of truth & sync"). Unlike the Tom Select component, this one expects `window.Tabulator` to be **preloaded** — include the Tabulator JS `<script>` in the page.
 
 ### `<rocket-tabulator>`
 
@@ -151,7 +151,7 @@ A Datastar **Rocket** 1.0 JS-API web component wrapping [Tabulator 6.3](https://
 | `height` | string | `"311px"` | CSS height for the grid |
 | `layout` | string | `"fitColumns"` | Tabulator layout mode |
 | `placeholder` | string | `"No Data"` | Empty-table message |
-| `movable-columns` | boolean | `false` | Allow column drag reorder |
+| `movable-columns` | boolean | `true` | Allow column drag reorder (`"false"` per grid to turn it off) |
 | `resizable-columns` | boolean | `true` | Allow column resize |
 | `enable-row-click` | boolean | `false` | Attach row click handlers |
 | `selectable-rows` | boolean | `false` | Show checkbox column for row selection |
@@ -162,6 +162,11 @@ A Datastar **Rocket** 1.0 JS-API web component wrapping [Tabulator 6.3](https://
 | `lock-column-order` | boolean | `false` | Column picker is hide/show only — no drag-to-reorder grip |
 | `selection-checkbox` | boolean | `true` | With `selectable-rows`: controls the leading checkbox column. Set `false` to keep row-highlight selection without the checkbox (e.g. a diary grid) |
 | `group-by` | string | `""` | Open the grid grouped by this field; group header shows `field : value (n items)`. Runtime regrouping via `_tabInstance.setGroupBy()` |
+| `column-calcs` | string | `""` | Tabulator column-calc placement: `""`, `both`, `group`, `table` (`both`/`group` give per-group subtotal rows) |
+| `group-toggle` | string | `""` | Group toggle element: `""` (arrow), `header`, `arrow` |
+| `movable-rows` | boolean | `false` | Drag rows to reorder (pair with a `rowHandle: true` column; listen for `rowMoved` on `_tabInstance`) |
+
+Rows after build: `host._setRows(rows)` / `window._rkSetRows(ids, rows)` — the server sends `sse.executeScript(`window._rkSetRows('grid-id', ${jsonForScript(rows)})`)`; tokens `app:<name>` resolve app formatters from `window._rkFormatters`. Full list in `rocket.md`.
 
 ### Events
 
@@ -171,6 +176,10 @@ A Datastar **Rocket** 1.0 JS-API web component wrapping [Tabulator 6.3](https://
 | `tab-rows-selected` | `{ rows }` | Fired on selection change (when `selectable-rows` is true) |
 | `tab-columns-changed` | `{ columns }` | Debounced 600ms on column move/resize/visibility change |
 | `tab-sorted` | `{ sorters }` | On every sort change + once after build; `sorters` is `[{field, dir, title}]`, `[]` when unsorted (see `tabulator-rocket.md`) |
+
+**Multi-column sort:** Ctrl / Shift + click a header adds it as the next sort
+(click order = sort order; again = asc → desc → removed); with 2+ sorts each
+sorted header shows a rank number (1 = primary). See `tabulator-rocket.md`.
 
 ### Usage Examples
 

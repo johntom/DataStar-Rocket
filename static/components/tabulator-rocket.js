@@ -1,13 +1,31 @@
-// Rocket Tabulator component — Datastar v1.0.4 + Rocket beta.2 (free datastar-rocket.js bundle; the Pro v1.0.4 datastar-pro.js also includes Rocket — only the import path differs)
-// Public contract preserved from the RC.7/8 template version:
+// <rocket-tabulator> — Datastar Rocket (JS API, Rocket beta.2 / Datastar 1.0.4) wrapping Tabulator 6.3
+//
+// ─── SOURCE OF TRUTH ─────────────────────────────────────────────────────────
+// This file, C:\Code\datastar\vendor\DataStar-Rocket\static\components\
+// tabulator-rocket.js (github.com/johntom/DataStar-Rocket), is the ONE place
+// this component is edited. Every app carries a copy that is written by
+//   node scripts/sync-components.mjs --check     (report drift, write nothing)
+//   node scripts/sync-components.mjs --write     (copy to every target)
+// from the DataStar-Rocket repo root. The sync keeps each target's OWN
+// `import { rocket } from '…'` line (the bundle path / ?v= buster differs per
+// app) and its line endings; everything below the import is byte-identical
+// across copies. Fix a bug here, run the sync, then commit each app yourself.
+// Targets (2026-10-13): datastar-fastify-sdk/components, brm_FlowDS,
+// brm_websiteDS, galleryHelen/John/Ken/Nina/Vector, parktowerDS, gail_parenteau
+// — the list lives in scripts/sync-components.mjs. Docs: rocket.md
+// ("rocket-tabulator") + README.md in this repo.
+//
+// Public contract (preserved from the RC.7/8 template version):
 //   tag:       <rocket-tabulator>
 //   props:     columns, data, height, layout, placeholder,
-//              movable-columns, resizable-columns, enable-row-click,
-//              selectable-rows, initial-sort, initial-filters, row-index,
+//              movable-columns (default true), resizable-columns,
+//              enable-row-click, selectable-rows, selection-checkbox,
+//              initial-sort, initial-filters, row-index,
 //              filter-bar   (opt-in: shows a blue active-filter status
 //                            footer like the legacy Delphi grid),
 //              lock-column-order (opt-in: column picker is hide/show only —
-//                            no drag-to-reorder grip/handlers)
+//                            no drag-to-reorder grip/handlers),
+//              column-calcs, group-toggle, group-by, movable-rows
 //   emits:     tab-row-click   { row }
 //              tab-columns-changed { columns: [{field, visible, width}] }   (debounced 600ms)
 //              tab-rows-selected   { rows }   (only when selectable-rows is set)
@@ -16,10 +34,33 @@
 //                            state; sorters is [] when no sort is applied)
 //   element methods/props:
 //              _tabInstance     - the Tabulator instance
+//              _tabReady        - promise resolved after tableBuilt
+//              _setRows(rows)   - hand a row ARRAY to the grid (setData + re-sort);
+//                                 the server-driven path, see window._rkSetRows
 //              _showColPicker(anchorEl) - toggle the column picker popup
+//              _resolveColumns(defs) - run string tokens through the resolver
+//                                 before a post-construction setColumns()
+//              _checklistFilter - the Apply/Clear checklist header-filter factory
+//   globals:   window._rkSetRows(ids, rows) - rows → one or more hosts by id
+//                                 (what sse.executeScript calls)
+//              window.brmColPicker(anchorEl, tabInstance, opts) - the shared picker
+//              window._rkFormatters - OPTIONAL app registry for "app:<name>"
+//                                 formatter tokens (see resolveColumnHelpers)
 //
-// Tabulator global is loaded via a <script> tag in layout.njk.
+// String tokens in JSON column defs (resolveColumnHelpers): sorters mmddyyyy /
+// money, calcs moneySum, headerFilter checklistFilter, formatters isoDate /
+// signedMoney / notesWrap / statusBadge / openClaimButton / accountScanLink /
+// scanPaymentSearch / "app:<name>" ("pt:<name>" alias). The last four named
+// formatters encode brm-app navigation contracts (window.openClaimTab,
+// window._loadScansFor, window._searchScanPayments); they are inert unless a
+// column opts in by name, so they are harmless in any other app.
+//
+// Tabulator global is loaded via a <script> tag on the page (not imported here).
 
+// The bundle URL below (incl. any ?v= buster) must be byte-identical to the
+// page's <script type="module"> / <link rel="modulepreload"> for the Datastar
+// bundle — a different URL would load a SECOND Datastar engine. The sync script
+// preserves each app's own line.
 import { rocket } from '/static/datastar-rocket.js'
 
 function parseJSONStr(raw) {
@@ -35,6 +76,66 @@ function isoDateFormatter(cell) {
   if (!v) return ''
   const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/)
   return m ? m[2] + '/' + m[3] + '/' + m[1] : v
+}
+
+// ── Export dates as the grid shows them (JJ 2026-09-17) ─────────────────────
+// Firebird DATE/TIMESTAMP values reach the browser as ISO strings
+// ("2019-07-01T04:00:00.000Z" / "2026-01-15"); every grid DISPLAYS them as
+// MM/DD/YYYY through a formatter, but Tabulator's download() (and
+// _groupBar.exportAoa) write the RAW cell value, so Excel/CSV exports carried
+// the ISO shape. Every column now gets this as its default `accessorDownload`
+// (Tabulator calls it for xlsx/csv downloads; group-bar.js honours the same
+// definition key): a date-like raw value is replaced by what the column's own
+// formatter renders (so a grid that shows "MM/DD/YYYY HH:MM" exports that),
+// falling back to MM/DD/YYYY from the ISO parts. Non-date values pass
+// through untouched, and a column that defines its own accessorDownload
+// keeps it.
+const ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/
+function isDateLike(v) {
+  return v instanceof Date || (typeof v === 'string' && ISO_DATE_RE.test(v))
+}
+function mdyOf(v) {
+  const p = (n) => String(n).padStart(2, '0')
+  if (v instanceof Date) {
+    return isNaN(v.getTime()) ? '' : p(v.getMonth() + 1) + '/' + p(v.getDate()) + '/' + v.getFullYear()
+  }
+  const m = ISO_DATE_RE.exec(v)
+  return m ? m[2] + '/' + m[3] + '/' + m[1] : v
+}
+function dateDownloadAccessor(value, data, _type, _params, column, row) {
+  if (!isDateLike(value)) return value
+  let def = null
+  try { def = column && typeof column.getDefinition === 'function' ? column.getDefinition() : null } catch { /* ignore */ }
+  const fmt = def && def.formatter
+  if (typeof fmt === 'function') {
+    // Render through the column's formatter with a minimal cell stand-in
+    // (getValue / getData / getRow / getElement cover every formatter here).
+    try {
+      const el = document.createElement('div')
+      const rowStub = row && typeof row.getData === 'function'
+        ? row
+        : { getData: () => data, getElement: () => el, getIndex: () => undefined }
+      const cell = {
+        getValue: () => value, getOldValue: () => value, getData: () => data,
+        getRow: () => rowStub, getElement: () => el, getColumn: () => column,
+        getField: () => def.field, getTable: () => (column.getTable ? column.getTable() : null),
+      }
+      const out = fmt(cell, def.formatterParams || {}, () => {})
+      let text = ''
+      if (typeof out === 'string') text = out.replace(/<[^>]*>/g, '').trim()
+      else if (out && out.nodeType === 1) text = String(out.textContent || '').trim()
+      if (text) return text
+    } catch { /* fall through to the ISO parts */ }
+  }
+  return mdyOf(value)
+}
+// Give every field column (incl. nested column groups) the default accessor.
+function applyDefaultDownloadAccessor(cols) {
+  ;(cols || []).forEach((c) => {
+    if (!c || typeof c !== 'object') return
+    if (Array.isArray(c.columns)) applyDefaultDownloadAccessor(c.columns)
+    if (c.field && c.accessorDownload === undefined) c.accessorDownload = dateDownloadAccessor
+  })
 }
 
 function notesWrapFormatter(cell) {
@@ -53,9 +154,21 @@ function notesWrapFormatter(cell) {
   return div
 }
 
+// Tabulator 6.3 writes a STRING tooltip with innerHTML (stored XSS from a
+// diary note) — return an element so the preview is text-only.
 function notesWrapTooltip(_e, cell) {
   const v = cell.getValue() || ''
-  return v.length > 200 ? v.substring(0, 200) + '…' : v
+  const div = document.createElement('div')
+  div.style.cssText = 'white-space:pre-wrap;word-break:break-word;max-width:40em;'
+  div.textContent = v.length > 200 ? v.substring(0, 200) + '…' : v
+  return div
+}
+
+// HTML-escape for the few formatters below that still build markup strings.
+function _escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
 // Status-pill formatter for the claims grid Status column. Reuses the
@@ -75,7 +188,9 @@ function openClaimButtonFormatter(cell) {
   const d = cell.getRow().getData() || {}
   const id = d.WCompID != null ? d.WCompID : d.LiabilityID
   if (id == null) return ''
-  const claimNo = String(d.ClaimNo || '').replace(/'/g, "\\'")
+  // ClaimNo goes into a JS string literal inside an HTML attribute: escape
+  // for the literal (\\ ') AND the attribute / markup (" < > &).
+  const claimNo = _escHtml(String(d.ClaimNo || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"))
   const townId  = Number(d.TownID) || 0
   return '<button class="btn btn--xs btn--primary" type="button" ' +
          'onclick="event.stopPropagation();window.openClaimTab(' +
@@ -100,6 +215,22 @@ function accountScanLinkFormatter(cell) {
          'window._loadScansFor(' + id + ',' + townId + ')">' + text + '</a>'
 }
 
+// WComp claims grid "ScanPay" column: load the account's scan queue and
+// filter Scan Payments by CariskWorker = the claim's worker last name.
+function scanPaymentSearchFormatter(cell) {
+  const d = cell.getRow().getData() || {}
+  const id = d.WCompID
+  const townId = Number(d.TownID) || 0
+  const last = String(d['Last Name'] || d.lastName || '').trim()
+  if (id == null || !last) return ''
+  // Last name goes into an inline onclick string: escape for the JS string
+  // literal and for the HTML attribute.
+  const safe = last.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/</g, '&lt;').replace(/"/g, '&quot;')
+  return '<a href="#" class="acct-scan-link" title="Scan Payments where CariskWorker matches ' + safe + '" ' +
+         'onclick="event.preventDefault();event.stopPropagation();' +
+         'window._searchScanPayments(' + id + ',' + townId + ',\'' + safe + '\')">&#128269; pay</a>'
+}
+
 function statusBadgeFormatter(cell) {
   const raw = cell.getValue()
   if (raw == null || raw === '') return ''
@@ -108,7 +239,7 @@ function statusBadgeFormatter(cell) {
   if (s === 'Open'   || s === '1') { code = '1'; label = 'Open' }
   else if (s === 'Closed' || s === '2') { code = '2'; label = 'Closed' }
   else if (s === 'ReOpen' || s === 'Re-Open' || s === '3') { code = '3'; label = 'ReOpen' }
-  else { code = '0'; label = s }
+  else { code = '0'; label = _escHtml(s) }
   return '<span class="cdf-status" data-status-value="' + code + '">' + label + '</span>'
 }
 
@@ -194,6 +325,11 @@ function makeChecklistFilter(registerCleanup) {
       listWrap.innerHTML = ''
       const table = cell.getTable()
       const vals = {}
+      // A column may name the full set of valid values
+      // (headerFilterParams.values) so the list is complete even when the
+      // loaded rows happen not to contain some of them.
+      const fixed = cell.getColumn().getDefinition().headerFilterParams?.values
+      if (Array.isArray(fixed)) fixed.forEach((v) => { if (v !== '') vals[v] = true })
       table.getData().forEach((row) => {
         const v = row[field]
         if (v !== undefined && v !== null && v !== '') vals[v] = true
@@ -340,6 +476,22 @@ function mmddyyyySorter(a, b) {
   return toN(a) - toN(b)
 }
 
+// Numeric sort for money columns. The claims grids ship Paid / Reserves /
+// Incurred as strings (Firebird NUMERIC through the driver, or pre-formatted
+// "$1,234.00"), so Tabulator's auto-picked STRING sorter ordered "$9.00"
+// above "$10.00" (JJ 2026-09-24 "sort on paid columns in wcomp grid should
+// be a numeric sort"). Applied to every column with formatter "money" /
+// "signedMoney" (or bottomCalc "moneySum") that sets no sorter of its own;
+// servers may also send sorter: 'money'. Blank/unparseable → 0.
+function moneySorter(a, b) {
+  const toN = (v) => {
+    if (v == null || v === '') return 0
+    const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[$,\s]/g, ''))
+    return isNaN(n) ? 0 : n
+  }
+  return toN(a) - toN(b)
+}
+
 // Money cell that renders NEGATIVE amounts (credits — e.g. a Pay Status = C
 // payment, whose Pay/Billed amounts are stored negative) in red. The cell
 // value arrives pre-formatted as a string ("$-1,234.00"); a minus sign marks
@@ -354,9 +506,32 @@ function signedMoneyFormatter(cell) {
   return s
 }
 
+// Column calc that SUMS pre-formatted money strings ("$1,234.00" /
+// "$-1,234.00" — the shape the payments routes render) and returns the total
+// in the same shape, so `bottomCalcFormatter: "signedMoney"` paints a
+// negative subtotal red like the cells. Tabulator's built-in "sum" calc
+// would read those strings as NaN. Servers send `bottomCalc: "moneySum"`;
+// pair with column-calcs="group" for per-group subtotal rows only (the
+// payments tabs keep their own grand-total footer).
+function moneySumCalc(values) {
+  let total = 0
+  ;(values || []).forEach((v) => {
+    if (v == null || v === '') return
+    const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[$,\s]/g, ''))
+    if (!isNaN(n)) total += n
+  })
+  total = Math.round(total * 100) / 100
+  return '$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 // Resolve string formatter/headerFilter/sorter placeholders to actual functions
 function resolveColumnHelpers(cols, checklistFilter) {
+  applyDefaultDownloadAccessor(cols)
   cols.forEach((c) => {
+    if (c.bottomCalc === 'moneySum') c.bottomCalc = moneySumCalc
+    if (c.topCalc === 'moneySum') c.topCalc = moneySumCalc
+    if (c.bottomCalcFormatter === 'signedMoney') c.bottomCalcFormatter = signedMoneyFormatter
+    if (c.topCalcFormatter === 'signedMoney') c.topCalcFormatter = signedMoneyFormatter
     if (c.headerFilter === 'checklistFilter') c.headerFilter = checklistFilter
     if (c.sorter === 'mmddyyyy') c.sorter = mmddyyyySorter
     // Auto-apply the chronological date sorter to any date column that didn't
@@ -366,8 +541,26 @@ function resolveColumnHelpers(cols, checklistFilter) {
     if (!c.sorter && (c.headerFilter === 'date' || c.formatter === 'isoDate')) {
       c.sorter = mmddyyyySorter
     }
+    if (c.sorter === 'money') c.sorter = moneySorter
+    if (!c.sorter && (c.formatter === 'money' || c.formatter === 'signedMoney' || c.bottomCalc === 'moneySum')) {
+      c.sorter = moneySorter
+    }
     if (c.formatter === 'signedMoney') c.formatter = signedMoneyFormatter
     if (c.formatter === 'isoDate') c.formatter = isoDateFormatter
+    // "app:<name>" — an APP-REGISTERED formatter: resolved against
+    // window._rkFormatters[name] (define the registry in the app's shared
+    // script before the grid builds) so JSON column defs can name app
+    // formatters without this component knowing them. "pt:<name>" is the
+    // parktowerDS spelling of the same thing (its registry is
+    // window._ptFormatters) — kept so its views need no change. A name with no
+    // function registered is left as-is (Tabulator then warns, as before).
+    if (typeof c.formatter === 'string' && /^(app|pt):/.test(c.formatter)) {
+      const name = c.formatter.replace(/^(app|pt):/, '')
+      const reg = (window._rkFormatters && window._rkFormatters[name]) ||
+                  (window._ptFormatters && window._ptFormatters[name])
+      if (typeof reg === 'function') c.formatter = reg
+      if (name === 'mdy' && !c.sorter) c.sorter = mmddyyyySorter
+    }
     if (c.formatter === 'notesWrap') {
       c.formatter = notesWrapFormatter
       c.tooltip = notesWrapTooltip
@@ -385,6 +578,159 @@ function resolveColumnHelpers(cols, checklistFilter) {
       c.formatter = accountScanLinkFormatter
       c.formatterParams = c.formatterParams || {}
     }
+    if (c.formatter === 'scanPaymentSearch') {
+      c.formatter = scanPaymentSearchFormatter
+      c.formatterParams = c.formatterParams || {}
+    }
+  })
+}
+
+// ── Shared column picker (show/hide + drag-to-reorder) ───────────────────────
+// window.brmColPicker(anchorEl, tabInstance, opts) — ONE picker for EVERY grid
+// (JJ 2026-08-19 "all grids should have ability to move columns also from
+// columns click"). Used by host._showColPicker below and, via the window
+// global, by the few grids that are plain Tabulator instances (payee-flow
+// detail grid) or pages that used to build their own checkbox-only popup.
+//   opts.lockOrder  — hide/show only, no drag grip (lock-column-order prop)
+//   opts.onChange   — called after every show/hide/reorder (e.g. autosave)
+//   opts.skip(def)  — return true to leave a column out of the list
+// Toggles: calling it again for the same table while open closes it.
+// Reorder: dragging a row onto another reorders the popup AND the grid
+// (tabInstance.moveColumn), so the two stay in sync.
+const _colPickerOpen = new WeakMap()   // tabInstance → { panel, close }
+function brmColPicker(anchorEl, tabInstance, opts) {
+  if (!tabInstance) return null
+  opts = opts || {}
+  const open = _colPickerOpen.get(tabInstance)
+  if (open) { open.close(); return null }
+
+  const allCols = tabInstance.getColumns()
+    .filter((c) => !!c.getField())
+    .filter((c) => !(opts.skip && opts.skip(c.getDefinition())))
+  // 40 fields per column: the 119-field wcomp set and the 83-field liability set both lay
+  // out in 3 columns (JJ 2026-09-25 "3 columns select like in liability"); short sets stay 1
+  // opts.columns forces the count (Analysis: always 3, JJ 2026-09-30)
+  const numCols = opts.columns > 0 ? Math.max(1, Math.round(opts.columns)) : Math.max(1, Math.ceil(allCols.length / 40))
+  const lockOrder = !!opts.lockOrder
+  const onChange = typeof opts.onChange === 'function' ? opts.onChange : () => {}
+
+  const panel = document.createElement('div')
+  panel.className = 'brm-col-picker'
+  panel.style.cssText =
+    'position:fixed;z-index:10000;' +
+    'background:var(--clr-surface,#fff);color:var(--clr-text,#333);' +
+    'border:1px solid var(--clr-border,#ccc);' +
+    'border-radius:4px;padding:6px 4px;max-height:calc(100vh - 40px);overflow-y:auto;' +
+    'box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:12px;' +
+    'column-count:' + numCols + ';column-gap:8px;min-width:' + (numCols * 180) + 'px;'
+
+  let dragSrc = null
+  allCols.forEach((col) => {
+    const def = col.getDefinition()
+    const row = document.createElement('div')
+    row.draggable = !lockOrder
+    row.dataset.field = def.field
+    row.style.cssText =
+      'display:flex;align-items:center;gap:4px;padding:2px 4px;' +
+      'cursor:pointer;border-radius:3px;white-space:nowrap;break-inside:avoid;'
+    if (!lockOrder) {
+      const grip = document.createElement('span')
+      grip.textContent = '⠇'
+      grip.title = 'Drag to reorder'
+      grip.style.cssText = 'cursor:grab;opacity:.5;font-size:14px;user-select:none;color:var(--clr-text,#666);'
+      row.appendChild(grip)
+    }
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'
+    cb.checked = col.isVisible()
+    cb.style.cssText = 'margin:0;cursor:pointer;'
+    cb.addEventListener('change', (e) => { e.stopPropagation(); col.toggle(); onChange() })
+    cb.addEventListener('mousedown', (e) => e.stopPropagation())
+    row.appendChild(cb)
+    row.appendChild(document.createTextNode(' ' + (def.title || def.field)))
+    row.addEventListener('mouseover', () => (row.style.background = 'var(--clr-bg,#f0f4ff)'))
+    row.addEventListener('mouseout', () => (row.style.background = ''))
+    if (!lockOrder) {
+      row.addEventListener('dragstart', (e) => {
+        dragSrc = row; row.style.opacity = '.4'
+        try { e.dataTransfer.effectAllowed = 'move' } catch {}
+      })
+      row.addEventListener('dragend', () => {
+        dragSrc = null; row.style.opacity = ''
+        panel.querySelectorAll('div').forEach((d) => (d.style.borderTop = ''))
+      })
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault()
+        try { e.dataTransfer.dropEffect = 'move' } catch {}
+        if (dragSrc && row !== dragSrc) row.style.borderTop = '2px solid #4472c4'
+      })
+      row.addEventListener('dragleave', () => (row.style.borderTop = ''))
+      row.addEventListener('drop', (e) => {
+        e.preventDefault(); row.style.borderTop = ''
+        if (!dragSrc || dragSrc === row) return
+        panel.insertBefore(dragSrc, row)
+        try { tabInstance.moveColumn(dragSrc.dataset.field, row.dataset.field, false) } catch {}
+        onChange()
+      })
+    }
+    panel.appendChild(row)
+  })
+
+  const rect = anchorEl ? anchorEl.getBoundingClientRect() : { bottom: 40, left: 40 }
+  document.body.appendChild(panel)
+  const panelRect = panel.getBoundingClientRect()
+  let top = rect.bottom + 4
+  const maxTop = window.innerHeight - panelRect.height - 4
+  if (top > maxTop) top = Math.max(4, maxTop)
+  let left = rect.left
+  if (left + panelRect.width > window.innerWidth - 4) left = Math.max(4, window.innerWidth - panelRect.width - 4)
+  panel.style.top = top + 'px'
+  panel.style.left = left + 'px'
+
+  function close() {
+    panel.remove()
+    document.removeEventListener('mousedown', onDown)
+    _colPickerOpen.delete(tabInstance)
+  }
+  function onDown(e) {
+    if (!panel.contains(e.target) && e.target !== anchorEl && !(anchorEl && anchorEl.contains(e.target))) close()
+  }
+  setTimeout(() => document.addEventListener('mousedown', onDown), 50)
+  _colPickerOpen.set(tabInstance, { panel, close })
+  return panel
+}
+window.brmColPicker = brmColPicker
+
+// window._rkSetRows(ids, rows) — hand a row ARRAY straight to one or more
+// <rocket-tabulator> hosts by element id (a string or an array of strings).
+// The server calls it through
+//   sse.executeScript(`window._rkSetRows('claims-grid', ${jsonForScript(rows)})`)
+// instead of patching a stringified signal bound with data-attr:data — that
+// path held the rowset three times (signal-store string, DOM attribute,
+// Tabulator data) and JSON-encoded it twice on the wire (2026-10-13; the
+// 13-14 grids' _lossApplyRows was the model). A host that is not on the page
+// yet, or whose table is still building, is retried every 100 ms for ~15 s;
+// only the LATEST rows handed to an id survive the wait.
+const _rkPendingRows = new Map()
+window._rkSetRows = function (ids, rows) {
+  const list = Array.isArray(ids) ? ids : [ids]
+  const data = Array.isArray(rows) ? rows : []
+  list.forEach((id) => {
+    if (!id) return
+    _rkPendingRows.set(id, data)
+    let tries = 0
+    const attempt = () => {
+      if (_rkPendingRows.get(id) !== data) return // superseded by a newer call
+      const el = document.getElementById(id)
+      if (el && typeof el._setRows === 'function') {
+        _rkPendingRows.delete(id)
+        el._setRows(data)
+        return
+      }
+      if (++tries < 150) setTimeout(attempt, 100)
+      else _rkPendingRows.delete(id)
+    }
+    attempt()
   })
 }
 
@@ -398,7 +744,10 @@ rocket('rocket-tabulator', {
     height: string.default('311px'),
     layout: string.default('fitColumns'),
     placeholder: string.default('No Data'),
-    movableColumns: bool.default(false),
+    // JJ 2026-08-19: every grid can reorder columns by dragging headers
+    // (was opt-in per view via movable-columns="true"). movable-columns="false"
+    // still turns it off for a specific grid.
+    movableColumns: bool.default(true),
     resizableColumns: bool.default(true),
     enableRowClick: bool.default(false),
     selectableRows: bool.default(false),
@@ -424,6 +773,11 @@ rocket('rocket-tabulator', {
     // header shows "field : value (n items)". Runtime regrouping still works
     // via _tabInstance.setGroupBy(). Empty = no grouping (default).
     groupBy: string.default(''),
+    // Drag rows to reorder (Tabulator movableRows — construction-time only,
+    // so it has to be a prop). Pair with a `rowHandle: true` column and
+    // listen for `rowMoved` on host._tabInstance (Maint → Databases uses it
+    // to renumber its Order column). Default false keeps every other grid.
+    movableRows: bool.default(false),
   }),
 
   render: ({ html }) => html`<div data-rocket-ref="tableEl" style="width:100%"></div>`,
@@ -443,6 +797,18 @@ rocket('rocket-tabulator', {
     // the JSON `columns` attribute where resolveColumnHelpers normally runs).
     // Such grids resolve the 'checklistFilter' token themselves from here.
     host._checklistFilter = checklistFilter
+    // Same idea for every string token (isoDate, signedMoney, moneySum,
+    // mmddyyyy, statusBadge, checklistFilter, …): a grid that calls
+    // setColumns() after construction can run its definitions through the
+    // component's own resolver first — the setColumns hook below only adds the
+    // download accessor, so an unresolved 'isoDate' reached Tabulator as an
+    // unknown formatter and dates showed raw ISO (Analysis pages, 2026-09-29).
+    // Opt-in on purpose: resolving inside the hook would also change grids
+    // that never asked (mailflow's money columns would gain moneySorter).
+    host._resolveColumns = (defs) => {
+      if (Array.isArray(defs)) resolveColumnHelpers(defs, checklistFilter)
+      return defs
+    }
 
     const cols = parseJSONStr(props.columns)
     const rows = parseJSONStr(props.data)
@@ -459,6 +825,7 @@ rocket('rocket-tabulator', {
       columns: cols,
     }
     if (props.rowIndex) config.index = props.rowIndex
+    if (props.movableRows) config.movableRows = true
     // Hand Tabulator a COPY — it mutates the initialSort array in place,
     // replacing each `column` string with the live Column object (circular
     // refs). Keeping `sort` pristine lets us re-apply it cleanly post-build.
@@ -512,8 +879,21 @@ rocket('rocket-tabulator', {
 
     const tabInstance = new window.Tabulator(refs.tableEl, config)
     host._tabInstance = tabInstance
+    // Columns set AFTER construction (users, ref-data, databases, mailflow,
+    // alerts, analysis: host._tabInstance.setColumns(defs)) bypass
+    // resolveColumnHelpers — give those definitions the same default
+    // download accessor so their date exports match the grid too.
+    const _origSetColumns = tabInstance.setColumns.bind(tabInstance)
+    tabInstance.setColumns = (defs) => {
+      if (Array.isArray(defs)) applyDefaultDownloadAccessor(defs)
+      return _origSetColumns(defs)
+    }
 
-    function renderFilterBar() {
+    // Tabulator's dataFiltered fires with (filters, rows) BEFORE the table's
+    // own active-row count is updated, so getDataCount('active') still reports
+    // the previous state (the bar read "48 of 48" with 4 rows showing). The
+    // rows argument is the filtered set - use it when present.
+    function renderFilterBar(_filters, filteredRows) {
       if (!filterBarEl || !host._tabInstance) return
       const footerWrap = filterBarEl.closest('.tabulator-footer')
       const parts = describeFilters(tabInstance)
@@ -546,7 +926,8 @@ rocket('rocket-tabulator', {
 
       let shown = 0
       let total = 0
-      try { shown = tabInstance.getDataCount('active') } catch {}
+      if (Array.isArray(filteredRows)) shown = filteredRows.length
+      else { try { shown = tabInstance.getDataCount('active') } catch {} }
       try { total = tabInstance.getDataCount('all') } catch {}
       const count = document.createElement('span')
       count.textContent = shown + ' of ' + total + ' rows'
@@ -660,6 +1041,59 @@ rocket('rocket-tabulator', {
     tabInstance.on('dataSorted', emitSorted)
     tabReady.then(emitSorted)
 
+    // Multi-column sort in CLICK order + rank numbers (brm_FlowDS 2026-10-21,
+    // JJ "how do you sort more than 1 column … it's not working"). Tabulator's
+    // own Ctrl/Shift+click pushes the clicked column to the END of its sort
+    // list and the LAST entry is the PRIMARY (see sortPayload) — so the column
+    // clicked second became the main sort and the grid looked re-sorted by it
+    // alone. A capture-phase listener takes the modified click first: the
+    // column joins as the LOWEST-priority sort (front of Tabulator's list);
+    // Ctrl/Shift+click on a sorted column flips asc → desc, a third time drops
+    // it. A plain click is untouched (Tabulator's single-column sort). The
+    // header filter inputs and resize handles are left alone.
+    refs.tableEl.addEventListener('click', (e) => {
+      if (!(e.ctrlKey || e.shiftKey || e.metaKey)) return
+      const t = e.target
+      if (!t || !t.closest) return
+      if (t.closest('.tabulator-header-filter, input, select, textarea, .tabulator-col-resize-handle')) return
+      const colEl = t.closest('.tabulator-col.tabulator-sortable')
+      if (!colEl || !refs.tableEl.contains(colEl)) return
+      const field = colEl.getAttribute('tabulator-field')
+      if (!field) return
+      e.stopPropagation()
+      e.preventDefault()
+      const list = tabInstance.getSorters().map((s) => ({ column: s.field, dir: s.dir }))
+      const i = list.findIndex((s) => s.column === field)
+      if (i < 0) list.unshift({ column: field, dir: 'asc' })
+      else if (list[i].dir === 'asc') list[i].dir = 'desc'
+      else list.splice(i, 1)
+      try { if (list.length) tabInstance.setSort(list); else tabInstance.clearSort() } catch {}
+    }, true)
+
+    // Rank numbers: with 2+ sorted columns each sorted header shows a small
+    // 1 / 2 / 3 next to its arrow (1 = the primary sort). One sort → none.
+    const paintSortRanks = () => {
+      try {
+        refs.tableEl.querySelectorAll('.rk-sort-rank').forEach((n) => n.remove())
+        const sorters = tabInstance.getSorters()
+        if (sorters.length < 2) return
+        sorters.forEach((s, idx) => {
+          const el = s.column && s.column.getElement && s.column.getElement()
+          const arrow = el && el.querySelector('.tabulator-col-sorter')
+          if (!arrow) return
+          const rank = sorters.length - idx
+          const b = document.createElement('span')
+          b.className = 'rk-sort-rank'
+          b.textContent = String(rank)
+          b.title = 'Sort ' + rank + ' of ' + sorters.length
+          b.style.cssText = 'font-size:9px;font-weight:700;line-height:1;margin-left:2px;align-self:flex-start;'
+          arrow.appendChild(b)
+        })
+      } catch {}
+    }
+    tabInstance.on('dataSorted', paintSortRanks)
+    tabReady.then(paintSortRanks)
+
     // Apply the saved initial-sort once the table is built. Passing data +
     // initialSort together in the constructor REGISTERS the sorters but does NOT
     // order the rows in this build (the claims grids get their rows at construct
@@ -669,8 +1103,30 @@ rocket('rocket-tabulator', {
     // mutates the array (column string → live Column object, circular).
     if (sort.length) tabReady.then(() => { try { tabInstance.setSort(sort.map((s) => ({ ...s }))) } catch {} })
 
-    // Data swap — preserves column state, sort, filters. Fires when $claimsData
-    // changes after build (e.g. a new search). setData replaces the rows WITHOUT
+    // applyRows(rows) — the ONE row-swap path (setData, then re-assert the
+    // active sort). Used by the `data` attribute observer below AND by
+    // host._setRows(rows), which window._rkSetRows calls: the direct path the
+    // server takes since 2026-10-13 — rows arrive as one executeScript call,
+    // never as a stringified signal copied into a giant data="…" attribute.
+    const applyRows = (rows) => {
+      const parsed = Array.isArray(rows) ? rows : []
+      let res
+      try { res = tabInstance.setData(parsed) } catch { return Promise.resolve() }
+      const reapply = () => {
+        const s = tabInstance.getSorters()
+        if (s.length) {
+          try { tabInstance.setSort(s.map((x) => ({ column: x.field, dir: x.dir }))) } catch {}
+        }
+      }
+      if (res && typeof res.then === 'function') return res.then(reapply).catch(() => {})
+      reapply()
+      return Promise.resolve()
+    }
+    host._setRows = (rows) => tabReady.then(() => applyRows(rows))
+
+    // Data swap — preserves column state, sort, filters. Fires when a bound
+    // `data` attribute changes after build (the starter page's $_gridData;
+    // every app grid now takes host._setRows). setData replaces the rows WITHOUT
     // re-running the active sort, so re-assert it afterward; empty getSorters()
     // (user cleared the sort) is a no-op so the server default is respected.
     // (The initial load is handled by the tabReady setSort above, since the
@@ -681,146 +1137,26 @@ rocket('rocket-tabulator', {
       if (dataStr === prevDataStr) return
       prevDataStr = dataStr
       tabReady.then(() => {
-        try {
-          const parsed = dataStr ? JSON.parse(dataStr) : []
-          const res = tabInstance.setData(parsed)
-          const reapply = () => {
-            const s = tabInstance.getSorters()
-            if (s.length) {
-              try { tabInstance.setSort(s.map((x) => ({ column: x.field, dir: x.dir }))) } catch {}
-            }
-          }
-          if (res && typeof res.then === 'function') res.then(reapply).catch(() => {})
-          else reapply()
-        } catch {}
+        let parsed = []
+        try { parsed = dataStr ? JSON.parse(dataStr) : [] } catch { return }
+        return applyRows(parsed)
       })
     }, 'data')
 
-    // Column picker with drag-to-reorder
-    let colPickerPanel = null
-    let colPickerCleanup = null
-
-    host._showColPicker = function (anchorEl) {
+    // Column picker with drag-to-reorder — the shared brmColPicker (above).
+    // extra (optional): { columns: n } forces the picker's column count.
+    host._showColPicker = function (anchorEl, extra) {
       if (!tabInstance) return
-
-      if (colPickerPanel) {
-        colPickerPanel.remove()
-        colPickerPanel = null
-        if (colPickerCleanup) colPickerCleanup()
-        colPickerCleanup = null
-        return
-      }
-
-      const allCols = tabInstance.getColumns().filter((c) => !!c.getField())
-      const numCols = Math.max(1, Math.ceil(allCols.length / 30))
-
-      const panel = document.createElement('div')
-      colPickerPanel = panel
-      panel.style.cssText =
-        'position:fixed;z-index:1000;' +
-        'background:var(--clr-surface,#fff);color:var(--clr-text,#333);' +
-        'border:1px solid var(--clr-border,#ccc);' +
-        'border-radius:4px;padding:6px 4px;max-height:750px;overflow-y:auto;' +
-        'box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:12px;' +
-        'column-count:' + numCols + ';column-gap:8px;min-width:' + (numCols * 180) + 'px;'
-
-      let dragSrc = null
-
-      const lockOrder = !!props.lockColumnOrder
-
-      allCols.forEach((col) => {
-        const def = col.getDefinition()
-        const row = document.createElement('div')
-        row.draggable = !lockOrder
-        row.dataset.field = def.field
-        row.style.cssText =
-          'display:flex;align-items:center;gap:4px;padding:2px 4px;' +
-          'cursor:pointer;border-radius:3px;white-space:nowrap;break-inside:avoid;'
-
-        // Drag grip — omitted when column order is locked.
-        if (!lockOrder) {
-          const grip = document.createElement('span')
-          grip.textContent = '⠇'
-          grip.style.cssText = 'cursor:grab;opacity:.5;font-size:14px;user-select:none;color:var(--clr-text,#666);'
-          row.appendChild(grip)
-        }
-
-        const cb = document.createElement('input')
-        cb.type = 'checkbox'
-        cb.checked = col.isVisible()
-        cb.style.cssText = 'margin:0;cursor:pointer;'
-        cb.addEventListener('change', (e) => {
-          e.stopPropagation()
-          col.toggle()
-          emitColumnState()
-        })
-        row.appendChild(cb)
-        row.appendChild(document.createTextNode(' ' + (def.title || def.field)))
-
-        row.addEventListener('mouseover', () => (row.style.background = 'var(--clr-bg,#f0f4ff)'))
-        row.addEventListener('mouseout', () => (row.style.background = ''))
-
-        if (!lockOrder) {
-          row.addEventListener('dragstart', (e) => {
-            dragSrc = row
-            row.style.opacity = '.4'
-            e.dataTransfer.effectAllowed = 'move'
-          })
-          row.addEventListener('dragend', () => {
-            dragSrc = null
-            row.style.opacity = ''
-            panel.querySelectorAll('div').forEach((d) => (d.style.borderTop = ''))
-          })
-          row.addEventListener('dragover', (e) => {
-            e.preventDefault()
-            e.dataTransfer.dropEffect = 'move'
-            if (dragSrc && row !== dragSrc) row.style.borderTop = '2px solid #4472c4'
-          })
-          row.addEventListener('dragleave', () => (row.style.borderTop = ''))
-          row.addEventListener('drop', (e) => {
-            e.preventDefault()
-            row.style.borderTop = ''
-            if (!dragSrc || dragSrc === row) return
-            panel.insertBefore(dragSrc, row)
-            tabInstance.moveColumn(dragSrc.dataset.field, row.dataset.field, true)
-            emitColumnState()
-          })
-        }
-
-        panel.appendChild(row)
-      })
-
-      const rect = anchorEl ? anchorEl.getBoundingClientRect() : host.getBoundingClientRect()
-      document.body.appendChild(panel)
-      const panelRect = panel.getBoundingClientRect()
-      let top = rect.bottom + 4
-      const maxTop = window.innerHeight - panelRect.height - 4
-      if (top > maxTop) top = Math.max(4, maxTop)
-      panel.style.top = top + 'px'
-      panel.style.left = rect.left + 'px'
-
-      function onDown(e) {
-        if (!panel.contains(e.target) && e.target !== anchorEl) {
-          panel.remove()
-          colPickerPanel = null
-          document.removeEventListener('mousedown', onDown)
-          colPickerCleanup = null
-        }
-      }
-      setTimeout(() => document.addEventListener('mousedown', onDown), 50)
-      colPickerCleanup = () => document.removeEventListener('mousedown', onDown)
+      brmColPicker(anchorEl, tabInstance, Object.assign({
+        lockOrder: !!props.lockColumnOrder,
+        onChange: emitColumnState,
+      }, extra || {}))
     }
 
     cleanup(() => {
       clearTimeout(colTimer)
-      if (colPickerPanel) {
-        colPickerPanel.remove()
-        colPickerPanel = null
-      }
-      if (colPickerCleanup) {
-        colPickerCleanup()
-        colPickerCleanup = null
-      }
+      const openPicker = tabInstance && _colPickerOpen.get(tabInstance)
+      if (openPicker) openPicker.close()
       cellCleanups.forEach((fn) => {
         try { fn() } catch {}
       })
@@ -829,6 +1165,7 @@ rocket('rocket-tabulator', {
         try { host._tabInstance.destroy() } catch {}
         host._tabInstance = null
       }
+      host._setRows = null
     })
   },
 })

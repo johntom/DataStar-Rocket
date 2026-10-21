@@ -175,6 +175,25 @@ To show the current sort and have it **survive reload and re-search**:
   entry as primary; `tab-sorted` already reverses this so `sorters[0]` is the
   primary the user sees. Don't re-reverse it.
 
+## Multi-column sort — Ctrl / Shift + click (2026-10-21)
+
+- **Click** a header → sort by that column only (Tabulator's own behaviour).
+- **Ctrl+click** (or Shift / Cmd+click) another header → it joins as the
+  NEXT sort, so the column clicked first stays the primary. Ctrl+click a
+  column that is already sorted → asc → desc → removed.
+- With **2+ sorted columns** each sorted header shows a small rank number
+  (`span.rk-sort-rank`, 1 = primary) next to its arrow; one sort shows none.
+
+Why the component does this itself: Tabulator 6.3's own Ctrl/Shift+click
+PUSHES the clicked column to the end of its sort list, and the last entry is
+the primary — so the column clicked second became the main sort and the grid
+looked re-sorted by it alone. A capture-phase click listener on the table
+element handles the modified click first (header filter inputs and the
+resize handle are left alone) and calls `setSort` with the new column at the
+FRONT of Tabulator's list (= lowest priority). `tab-sorted` / `_lastSorters`
+still report primary-first, so saved sorts and "Sorted by …" labels are
+unchanged. Nothing to configure; works on every grid.
+
 ---
 
 ## Gotchas

@@ -100,7 +100,7 @@ A Datastar Rocket web component wrapping [Tabulator 6.3](https://tabulator.info/
 | `height` | str | `"311px"` | CSS height for the grid |
 | `layout` | str | `"fitColumns"` | Tabulator layout mode |
 | `placeholder` | str | `"No Data"` | Empty-table message |
-| `movable-columns` | bool | `false` | Allow column drag reorder |
+| `movable-columns` | bool | `true` | Allow column drag reorder (default flipped to `true` 2026-08-19 — every grid reorders by header drag; set `"false"` per grid to turn it off) |
 | `resizable-columns` | bool | `true` | Allow column resize |
 | `enable-row-click` | bool | `false` | Attach row click handlers |
 | `selectable-rows` | bool | `false` | Show checkbox column for row selection |
@@ -109,11 +109,19 @@ A Datastar Rocket web component wrapping [Tabulator 6.3](https://tabulator.info/
 | `lock-column-order` | bool | `false` | Make the column picker **hide/show only** — omits the drag-to-reorder grip and drag handlers. Other reorder paths (header drag via `movable-columns`) are unaffected. |
 | `column-calcs` | str | `""` | Tabulator column-calculation placement: `""` (off), `both`, `group`, or `table`. `both`/`group` produce per-group subtotal rows when grouping. Per-column `bottomCalc` in the column defs is independent of this. |
 | `group-toggle` | str | `""` | Group toggle element (maps to Tabulator `groupToggleElement`): `""` (default arrow), `header` (whole group header click-toggles collapse), or `arrow`. |
+| `group-by` | str | `""` | Open the grid grouped by this field; group header shows `field : value (n items)`. Runtime regrouping via `_tabInstance.setGroupBy()`. |
+| `initial-filters` | str | `""` | JSON `[{field, value}]` header filters applied once the table is built (server-saved state). |
+| `row-index` | str | `""` | Field name used as the Tabulator row index (`index`). |
+| `selection-checkbox` | bool | `true` | With `selectable-rows`: show the leading checkbox column. `"false"` keeps row-highlight selection without the checkbox. |
+| `movable-rows` | bool | `false` | Drag rows to reorder (Tabulator `movableRows`, construction-time only). Pair with a `rowHandle: true` column and listen for `rowMoved` on `_tabInstance`. |
 
 Two host properties are also exposed for grids driven post-construction:
 
 - **`host._tabReady`** — a promise resolving after `tableBuilt`. Grids that call `host._tabInstance.setColumns()/replaceData()` after construction (columns carrying live formatter/sorter closures that can't go through the JSON `columns` attribute) must `await` it so resize handles bind.
 - **`host._checklistFilter`** — the Apply/Clear checklist header-filter factory, for those same post-construction grids to resolve the `checklistFilter` token themselves.
+- **`host._resolveColumns(defs)`** — run string tokens (below) through the resolver before a post-construction `setColumns(defs)`; the `setColumns` hook only adds the export date accessor, on purpose.
+- **`host._setRows(rows)`** — hand a row **array** to the grid: waits for `tableBuilt`, `setData`, then re-asserts the active sort. Column state, filters and layout survive. Nulled on disconnect.
+- **`window._rkSetRows(ids, rows)`** (module-level global) — `_setRows` for one id or an array of ids, retried every 100 ms for ~15 s while a host is not on the page / not built yet (latest rows per id win). **This is how a server sends rows** — `sse.executeScript(\`window._rkSetRows('grid-id', ${jsonForScript(rows)})\`)` — instead of patching a stringified signal bound with `data-attr:data`, which held the rowset three times (signal-store string, DOM attribute, Tabulator data) and JSON-encoded it twice. Bulk rows never belong in a signal; if a grid must stay signal-fed, name the signal with a leading `_` so Datastar never sends it back to the server.
 
 ### Events
 
@@ -123,6 +131,14 @@ Two host properties are also exposed for grids driven post-construction:
 | `tab-rows-selected` | `{ rows: array }` | Fires on select/deselect (requires `selectable-rows`) |
 | `tab-columns-changed` | `{ columns: [{field, visible, width}] }` | Debounced 600ms on column move/resize/visibility change |
 | `tab-sorted` | `{ sorters: [{field, dir, title}] }` | Fires on every sort change (header click or programmatic `setSort`) **and once after build** for the initial/restored state. `sorters` is **primary-first** (Tabulator reports multi-column sort last-primary; the event reverses it) and carries each column's display `title`. `sorters` is `[]` when no sort is applied. Use it to render a "Sorted by …" label that survives reload + search. The live payload is also cached on the host as `_lastSorters` for consumers that wire up after the build-time emit. |
+
+**Multi-column sort (2026-10-21):** click = one column; **Ctrl / Shift + click**
+adds the column as the next (lower-priority) sort, so click order = sort
+order; Ctrl+click a sorted column again flips asc → desc → removes it. With
+2+ sorts each sorted header shows a rank number (`span.rk-sort-rank`,
+1 = primary). The component handles the modified click itself because
+Tabulator's own Ctrl+click made the column clicked LAST the primary. See
+`tabulator-rocket.md`.
 
 ### Usage
 
@@ -217,6 +233,12 @@ to the real function at build time (in `resolveColumnHelpers`):
 | `openClaimButton` | `formatter` | Renders a primary "Open" button calling `window.openClaimTab(id, claimNo, townId)`; reads `WCompID`/`LiabilityID` + `TownID` from the row. _App-oriented._ |
 | `accountScanLink` | `formatter` | Account cell as a link calling `window._loadScansFor(id, townId)` (`stopPropagation` so a row-click open still works). _App-oriented._ |
 | `checklistFilter` | `headerFilter` | Apply/Clear multi-select checklist filter. Resolved automatically for JSON columns; for post-construction grids use `host._checklistFilter` (see Props). |
+| `isoDate` | `formatter` | Renders an ISO `YYYY-MM-DD[THH:mm…]` value as `MM/DD/YYYY`; auto-pairs with the `mmddyyyy` sorter. Export writes the displayed form (every column gets a default `accessorDownload` — date-like raw values export as rendered, never ISO). |
+| `money` | `sorter` | Numeric sort of `$-1,234.00`-style strings. **Auto-applied** to `formatter: "money"`/`"signedMoney"` and `bottomCalc: "moneySum"` columns without a sorter. |
+| `moneySum` | `bottomCalc` / `topCalc` | Sums money strings or numbers to a `$x,xxx.xx` total; the group-bar subtotals use it. |
+| `notesWrap` | `formatter` | Wrapping multi-line text cell + a hover tooltip that is a text-only **element** (Tabulator 6.3 writes a string tooltip with innerHTML — a stored-XSS vector). |
+| `scanPaymentSearch` | `formatter` | "🔍 pay" link calling `window._searchScanPayments(id, townId, lastName)`. _App-oriented._ |
+| `app:<name>` | `formatter` | **App registry**: resolved against `window._rkFormatters[name]` — define the registry in the app's shared script before the grid builds, and JSON column defs can name app formatters the component never heard of. `pt:<name>` is the parktowerDS spelling (registry `window._ptFormatters`; `pt:mdy` also gets the `mmddyyyy` sorter). An unregistered name is left as the string. |
 
 The `_App-oriented_` tokens encode brm-app navigation contracts
 (`window.openClaimTab` / `window._loadScansFor`); they're inert unless a column
@@ -226,9 +248,32 @@ opts in by name, so they're harmless for generic grids.
 
 - `columns` and `data` use `str` type (not `json`) to avoid Datastar signal proxy issues
 - Data updates are gated behind the `tableBuilt` event via a `tabReady` promise
-- Dynamic data swap via `data-attr:data="$signal"` preserves column state, sort, and filters
-- The component calls `setData()` (not full rebuild) when data changes
+- Rows after build arrive through `host._setRows(rows)` / `window._rkSetRows(ids, rows)` — one `setData()` (never a rebuild) that keeps column state, filters and the active sort. A bound `data-attr:data="$_signal"` attribute still works through the same `applyRows` path, but is kept only as an example (starter pages); bulk rows do not belong in signals.
 - Column state changes are debounced 600ms before emitting `tab-columns-changed`
+
+### Source of truth & sync (2026-10-13)
+
+`static/components/tabulator-rocket.js` **in this repo is the one place the
+component is edited.** Ten apps carry a copy (datastar-fastify-sdk/components,
+brm_FlowDS, brm_websiteDS, galleryHelen/John/Ken/Nina/Vector, parktowerDS,
+gail_parenteau); they used to drift (505 … 1,066 lines, parktower with its
+own `pt:` hook). Now:
+
+```bash
+node scripts/sync-components.mjs --check     # report drift, exit 1 if any (write nothing)
+node scripts/sync-components.mjs --write     # copy the canonical to every target
+node scripts/sync-components.mjs --write --all   # also tom-select-rocket.js / echarts-rocket.js
+```
+
+The sync keeps each target's **own** `import { rocket } from '…'` line (the
+bundle path and `?v=` buster differ per app: `/static/datastar-rocket.js` here,
+`/public/js/datastar-rocket.js` in the SDK, `/public/js/datastar-pro.js[?v=…]`
+in the Pro apps) and its line endings; everything below the import is
+byte-identical. The component is the same code on the free Rocket bundle and on
+a Pro ≥ 1.0.1 bundle (Rocket beta.1 → beta.2 was bug fixes only). Workflow: fix
+here → `--check` → `--write` → run each app's own tests → commit each app
+yourself (the script never touches git). Add a target line to the script when a
+new app gets a copy; a missing file is reported and skipped, never created.
 
 ---
 
