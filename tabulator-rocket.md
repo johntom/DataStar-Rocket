@@ -73,7 +73,12 @@ browser:
 ### 3. `rocket-tabulator` passes `editor` straight through
 
 The component only translates **formatter** string placeholders (`isoDate`,
-`notesWrap`, etc.) into functions. `editor` and `editorParams` are untouched,
+`notesWrap`, etc.) into functions — plus `tooltip`: `true` becomes a
+text-only tooltip of the cell's full value (Tabulator's own `true` writes the
+string with innerHTML; a value a user typed must never reach it as markup),
+and a column with NO `tooltip` key gets the automatic one: while the mouse is
+over a cell whose rendered text is cut off by the column width, the full text
+shows; a cell that fits shows nothing. `tooltip: false` turns it off. `editor` and `editorParams` are untouched,
 so Tabulator renders the editors natively.
 
 ### 4. Inline edits auto-save — and the per-row lock is enforced here

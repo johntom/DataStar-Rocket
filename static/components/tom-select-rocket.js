@@ -260,9 +260,28 @@ rocket('rocket-tom-select', {
       // Value last emitted via ts-change; used so the dropdown-close
       // auto-apply doesn't fire a duplicate emit right after Apply/Clear.
       let lastApplied = norm(ts.getValue())
+      // Re-entrancy guard (JJ 2026-10-21, the WComp Insured picker): apply()
+      // emits ts-change, and a page handler may answer with ts.setValue /
+      // ts.clear (the "All Insureds" toggle). TomSelect fires item_remove /
+      // item_add for those even when silent, with the dropdown already
+      // closed — so the item_remove auto-apply below re-applied a HALF-cleared
+      // value, whose handler called setValue again, and so on: a cascade that
+      // painted the chips of every suffix of the list (66 chips for 11 towns).
+      // Nothing that happens while apply() runs is a user action — ignore it,
+      // and take the value the handlers LEFT as the applied baseline.
+      let applying = false
       function apply (val) {
+        if (applying) return
+        applying = true
         lastApplied = norm(val)
-        fireChange.call(ts, val)
+        try { fireChange.call(ts, val) } finally { applying = false }
+        // The handlers may have changed the selection (the toggle sets every
+        // town / clears all): the baseline AND the value attribute follow it,
+        // so neither the auto-apply nor the attribute observer replays the
+        // value that was applied (which may hold the toggle sentinel).
+        lastApplied = norm(ts.getValue())
+        if (host.getAttribute('value') !== lastApplied) host.setAttribute('value', lastApplied)
+        lastSyncedValue = lastApplied
       }
       applyBtn.addEventListener('click', (e) => {
         e.stopPropagation()

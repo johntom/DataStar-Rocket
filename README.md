@@ -262,6 +262,8 @@ The same resolution pass also swaps these string placeholders in column definiti
 |----------------|--------------|--------|
 | `formatter` | `"isoDate"` | Formats `YYYY-MM-DD…` values as `MM/DD/YYYY` |
 | `formatter` | `"notesWrap"` | Wrapping multi-line cell; click opens a full-text popup (also sets a truncating tooltip) |
+| `tooltip` | `true` | The cell's full value while hovering, rendered text-only (Tabulator's own `true` writes the string with innerHTML) |
+| `tooltip` | *(absent)* | AUTOMATIC: a cell whose rendered text is cut off by the column width shows its full text while hovered (text-only); a cell that fits shows nothing. `false` turns it off for that column |
 | `headerFilter` | `"checklistFilter"` | The multi-select checklist filter above |
 
 ### Column Picker: `_showColPicker(anchorEl)`

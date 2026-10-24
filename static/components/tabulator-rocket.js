@@ -164,6 +164,43 @@ function notesWrapTooltip(_e, cell) {
   return div
 }
 
+// `tooltip: true` in a column definition → the cell's FULL value while the
+// mouse is over the cell, rendered TEXT-ONLY (Tabulator 6.3 writes a string
+// tooltip with innerHTML — a value typed by a user must never reach it as
+// markup). An empty value shows nothing. brm_FlowDS 2026-10-22 (the Docs
+// grids' File Desc, cut off at its column width — JJ "hover fails on wcomp
+// docs File Desc").
+function textTooltip(_e, cell) {
+  const v = cell.getValue()
+  if (v == null || v === '') return ''
+  const div = document.createElement('div')
+  div.style.cssText = 'white-space:pre-wrap;word-break:break-word;max-width:40em;'
+  div.textContent = String(v)
+  return div
+}
+
+// AUTOMATIC tooltip (every column that sets no `tooltip` of its own): while
+// the mouse is over a cell whose rendered text is CUT OFF by the column width
+// (or the clamp height), the full rendered text shows, text-only; a cell that
+// fits shows nothing. Measured at hover time on the cell element, so it
+// follows column resizes and saved widths. The RENDERED text (textContent)
+// is used, not the raw value — a formatted date / money cell reads as shown
+// and a button cell's markup never becomes a tooltip. brm_FlowDS 2026-10-22
+// (JJ: "thought it was an automatic display and any column where text was
+// not fully displayed"). `tooltip: false` in a column def keeps it off.
+function autoTooltip(_e, cell) {
+  const el = cell.getElement()
+  if (!el) return ''
+  const cut = el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1
+  if (!cut) return ''
+  const text = String(el.textContent || '').trim()
+  if (!text) return ''
+  const div = document.createElement('div')
+  div.style.cssText = 'white-space:pre-wrap;word-break:break-word;max-width:40em;'
+  div.textContent = text
+  return div
+}
+
 // HTML-escape for the few formatters below that still build markup strings.
 function _escHtml(s) {
   return String(s == null ? '' : s)
@@ -565,6 +602,11 @@ function resolveColumnHelpers(cols, checklistFilter) {
       c.formatter = notesWrapFormatter
       c.tooltip = notesWrapTooltip
     }
+    // tooltip: true (JSON column defs) → the text-only full-value tooltip
+    // instead of Tabulator's innerHTML string; no tooltip key at all → the
+    // automatic cut-off tooltip; false stays off.
+    if (c.tooltip === true) c.tooltip = textTooltip
+    else if (c.tooltip === undefined) c.tooltip = autoTooltip
     if (c.formatter === 'statusBadge') {
       c.formatter = statusBadgeFormatter
       // formatter outputs HTML — Tabulator needs to know not to escape it.
